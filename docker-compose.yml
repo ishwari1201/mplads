@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: mplads-postgis
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mplads_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mplads_secure_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-mplads_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./apps/backend-api/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./apps/backend-api/src/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+
+  redis:
+    image: redis:7-alpine
+    container_name: mplads-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  backend-api:
+    build:
+      context: ./apps/backend-api
+      dockerfile: Dockerfile
+    container_name: mplads-backend-api
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgres://${POSTGRES_USER:-mplads_admin}:${POSTGRES_PASSWORD:-mplads_secure_pass}@postgres:5432/${POSTGRES_DB:-mplads_db}
+      REDIS_URL: redis://redis:6379
+      ML_SERVICE_URL: http://ml-engine:8000
+      JWT_SECRET: ${JWT_SECRET:-mplads_jwt_secret_key_2026}
+    depends_on:
+      - postgres
+      - redis
+      - ml-engine
+    volumes:
+      - ./storage/uploads:/app/storage/uploads
+      - ./storage/docs:/app/storage/docs
+
+  ml-engine:
+    build:
+      context: ./apps/ml-engine
+      dockerfile: Dockerfile
+    container_name: mplads-ml-engine
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      ENVIRONMENT: production
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: mplads-web
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend-api
+
+volumes:
+  pgdata:
