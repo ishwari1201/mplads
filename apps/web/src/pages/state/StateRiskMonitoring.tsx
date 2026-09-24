@@ -112,14 +112,14 @@ export const StateRiskMonitoring: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-6 rounded-2xl border border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center space-x-3">
-          <span className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+          <span className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200">
             <ShieldAlert size={24} />
           </span>
           <div>
-            <h1 className="text-xl font-bold text-slate-100">State Risk & Anomaly Matrix</h1>
-            <p className="text-xs text-slate-400">
+            <h1 className="text-xl font-bold text-slate-900">State Risk & Anomaly Matrix</h1>
+            <p className="text-xs text-slate-600 font-medium">
               ML Fraud detection, SBERT text similarity, EXIF geotag photo anomalies & payment divergence monitoring
             </p>
           </div>
@@ -137,25 +137,25 @@ export const StateRiskMonitoring: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
           {error}
         </div>
       )}
 
       {/* Filter Controls Bar */}
-      <Card className="p-4 border-slate-800">
+      <Card className="p-4 border-slate-200 bg-white shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center space-x-2">
-              <Filter size={14} className="text-slate-400" />
-              <span className="text-slate-300 font-semibold">Filters:</span>
+              <Filter size={14} className="text-slate-500" />
+              <span className="text-slate-700 font-bold">Filters:</span>
             </div>
 
             {/* Risk Level Filter */}
             <select
               value={selectedRisk}
               onChange={(e) => setSelectedRisk(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+              className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-purple-500 shadow-xs"
             >
               <option value="ALL">All Risk Levels</option>
               <option value="CRITICAL">CRITICAL (80-100)</option>
@@ -168,7 +168,7 @@ export const StateRiskMonitoring: React.FC = () => {
             <select
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+              className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-purple-500 shadow-xs"
             >
               <option value="ALL">All Sectors</option>
               {sectors.map((s) => (
@@ -177,42 +177,42 @@ export const StateRiskMonitoring: React.FC = () => {
             </select>
 
             {/* Divergence Only Toggle */}
-            <label className="flex items-center space-x-2 cursor-pointer bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
+            <label className="flex items-center space-x-2 cursor-pointer bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-medium">
               <input
                 type="checkbox"
                 checked={divergenceOnly}
                 onChange={(e) => setDivergenceOnly(e.target.checked)}
-                className="rounded bg-slate-950 border-slate-800 text-purple-500 focus:ring-0"
+                className="rounded bg-white border-slate-300 text-purple-600 focus:ring-0"
               />
-              <span className="text-slate-300">Payment/Progress Divergence Flagged Only</span>
+              <span className="text-slate-700">Payment/Progress Divergence Flagged Only</span>
             </label>
           </div>
 
           {/* Search Box */}
           <div className="relative w-64">
-            <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search works..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+              className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500 shadow-xs"
             />
           </div>
         </div>
       </Card>
 
       {/* Works Matrix Table */}
-      <Card className="p-5 border-slate-800">
+      <Card className="p-5 border-slate-200 bg-white shadow-xs">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-slate-100">
+          <h2 className="text-sm font-bold text-slate-900">
             State Anomaly Directory ({filteredWorks.length} Works)
           </h2>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] font-semibold tracking-wider">
+            <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-y border-slate-200 tracking-wider">
               <tr>
                 <th className="p-3">Work Recommendation</th>
                 <th className="p-3">Sector</th>
@@ -223,22 +223,22 @@ export const StateRiskMonitoring: React.FC = () => {
                 <th className="p-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-300">
+            <tbody className="divide-y divide-slate-200 text-slate-700">
               {filteredWorks.map((w) => (
-                <tr key={w.id} className="hover:bg-slate-900/30 transition-colors">
+                <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-3">
-                    <div className="font-semibold text-slate-200">{w.title}</div>
-                    <div className="text-[11px] text-slate-400">{w.address}</div>
+                    <div className="font-semibold text-slate-900">{w.title}</div>
+                    <div className="text-[11px] text-slate-600">{w.address}</div>
                   </td>
-                  <td className="p-3 text-slate-300">{w.sector}</td>
-                  <td className="p-3 font-medium">₹{Number(w.sanctioned_amount || w.estimated_cost).toLocaleString('en-IN')}</td>
+                  <td className="p-3 text-slate-700 font-medium">{w.sector}</td>
+                  <td className="p-3 font-bold text-slate-900">₹{Number(w.sanctioned_amount || w.estimated_cost).toLocaleString('en-IN')}</td>
                   <td className="p-3">
-                    <div className="text-slate-200">
+                    <div className="text-slate-800 font-medium">
                       Pay: {w.payment_percentage}% | Phys: {w.physical_progress_percentage}%
                     </div>
                     {w.is_divergence_flagged && (
                       <Badge variant="danger" className="mt-1">
-                        +${w.payment_progress_divergence}% Divergence Delta
+                        +{w.payment_progress_divergence}% Divergence Delta
                       </Badge>
                     )}
                   </td>
@@ -250,16 +250,16 @@ export const StateRiskMonitoring: React.FC = () => {
                   <td className="p-3">
                     {w.risk_score >= 60 ? (
                       <div className="space-y-1 text-[11px]">
-                        <div className="text-rose-400 font-medium flex items-center space-x-1">
+                        <div className="text-rose-700 font-bold flex items-center space-x-1">
                           <AlertTriangle size={12} />
                           <span>COST_ANOMALY & SBERT Text Similarity</span>
                         </div>
                         {w.is_divergence_flagged && (
-                          <div className="text-amber-400">PAYMENT_PROGRESS_DIVERGENCE</div>
+                          <div className="text-amber-800 font-semibold">PAYMENT_PROGRESS_DIVERGENCE</div>
                         )}
                       </div>
                     ) : (
-                      <span className="text-emerald-400 font-medium">Standard baseline</span>
+                      <span className="text-emerald-700 font-semibold">Standard baseline</span>
                     )}
                   </td>
                   <td className="p-3 text-right">
@@ -275,7 +275,7 @@ export const StateRiskMonitoring: React.FC = () => {
                       </Button>
                       <button
                         onClick={() => navigate(`/state/work/${w.id}`)}
-                        className="text-sky-400 hover:text-sky-300 font-semibold flex items-center space-x-1 text-xs"
+                        className="text-sky-700 hover:text-sky-900 font-bold flex items-center space-x-1 text-xs"
                       >
                         <span>Work Detail</span>
                         <Eye size={12} />

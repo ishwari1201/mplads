@@ -5,7 +5,7 @@ import { WorkRecommendation } from '../../types/project';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { LeafletMap } from '../../components/map/LeafletMap';
+import { ConstituencyWorkMap } from '../../components/map/ConstituencyWorkMap';
 import { FundAllocationTracker } from './FundAllocationTracker';
 import { PlusCircle, DollarSign, Clock, FileCheck, AlertTriangle, Layers } from 'lucide-react';
 
@@ -27,8 +27,8 @@ export const MpDashboard: React.FC = () => {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">Member of Parliament Operational Portal</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-2xl font-bold text-slate-900">Member of Parliament Operational Portal</h2>
+          <p className="text-xs text-slate-500">
             Constituency: {stats?.constituency_name || 'Mumbai South'} ({stats?.party || 'Lok Sabha'})
           </p>
         </div>
@@ -48,50 +48,50 @@ export const MpDashboard: React.FC = () => {
 
       {/* 1. Executive Stats Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card hoverEffect={false}>
-          <CardContent className="flex items-center space-x-4">
-            <div className="p-3 bg-sky-500/10 text-sky-400 rounded-xl">
+        <Card hoverEffect={false} className="bg-white border-slate-200">
+          <CardContent className="flex items-center space-x-4 p-5">
+            <div className="p-3 bg-sky-50 text-sky-700 rounded-xl border border-sky-100">
               <DollarSign size={24} />
             </div>
             <div>
-              <div className="text-xs text-slate-400 font-medium">Total Annual Entitlement</div>
-              <div className="text-xl font-extrabold text-slate-100">₹{totalCr} Cr</div>
+              <div className="text-xs text-slate-500 font-medium">Total Annual Entitlement</div>
+              <div className="text-xl font-extrabold text-slate-900">₹{totalCr} Cr</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card hoverEffect={false}>
-          <CardContent className="flex items-center space-x-4">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
+        <Card hoverEffect={false} className="bg-white border-slate-200">
+          <CardContent className="flex items-center space-x-4 p-5">
+            <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
               <FileCheck size={24} />
             </div>
             <div>
-              <div className="text-xs text-slate-400 font-medium">Spent / Recommended</div>
-              <div className="text-xl font-extrabold text-emerald-400">₹{spentCr} Cr</div>
+              <div className="text-xs text-slate-500 font-medium">Spent / Recommended</div>
+              <div className="text-xl font-extrabold text-emerald-700">₹{spentCr} Cr</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card hoverEffect={false}>
-          <CardContent className="flex items-center space-x-4">
-            <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+        <Card hoverEffect={false} className="bg-white border-slate-200">
+          <CardContent className="flex items-center space-x-4 p-5">
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-xl border border-amber-100">
               <Clock size={24} />
             </div>
             <div>
-              <div className="text-xs text-slate-400 font-medium">Unsanctioned Works</div>
-              <div className="text-xl font-extrabold text-amber-400">{pendingCount} Pending</div>
+              <div className="text-xs text-slate-500 font-medium">Unsanctioned Works</div>
+              <div className="text-xl font-extrabold text-amber-700">{pendingCount} Pending</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card hoverEffect={false}>
-          <CardContent className="flex items-center space-x-4">
-            <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl">
+        <Card hoverEffect={false} className="bg-white border-slate-200">
+          <CardContent className="flex items-center space-x-4 p-5">
+            <div className="p-3 bg-rose-50 text-rose-700 rounded-xl border border-rose-100">
               <AlertTriangle size={24} />
             </div>
             <div>
-              <div className="text-xs text-slate-400 font-medium">High Risk Alerts</div>
-              <div className="text-xl font-extrabold text-rose-400">{highRiskCount} Flagged</div>
+              <div className="text-xs text-slate-500 font-medium">High Risk Alerts</div>
+              <div className="text-xl font-extrabold text-rose-700">{highRiskCount} Flagged</div>
             </div>
           </CardContent>
         </Card>
@@ -103,28 +103,28 @@ export const MpDashboard: React.FC = () => {
       {/* 3. Recent Recommendations (Left) & GIS Map (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Side: Recent Recommendations */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-sm font-bold text-slate-100 flex items-center justify-between">
+        <Card className="lg:col-span-1 bg-white border-slate-200">
+          <CardHeader className="pb-3 border-b border-slate-100">
+            <CardTitle className="text-sm font-bold text-slate-900 flex items-center justify-between">
               <span>Recent Recommendations</span>
-              <Link to="/mp/recommendations" className="text-xs text-sky-400 font-semibold hover:underline">
+              <Link to="/mp/recommendations" className="text-xs text-sky-700 font-semibold hover:underline">
                 View All
               </Link>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3.5">
+          <CardContent className="space-y-3 pt-3">
             {recommendations.slice(0, 4).map((rec: any) => (
-              <div key={rec.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="font-semibold text-xs text-slate-200 line-clamp-1">{rec.title}</div>
+              <div key={rec.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 space-y-2 hover:bg-slate-100/70 transition-colors shadow-2xs">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="font-bold text-xs text-slate-900 line-clamp-1">{rec.title}</div>
                   <Badge variant={rec.status === 'SANCTIONED' ? 'success' : rec.status === 'FROZEN_PENDING_AUDIT' ? 'danger' : 'warning'}>
                     {rec.status === 'FROZEN_PENDING_AUDIT' ? 'FROZEN' : rec.status}
                   </Badge>
                 </div>
-                <div className="text-[11px] text-slate-400 line-clamp-1">{rec.address}</div>
-                <div className="flex justify-between items-center text-xs pt-1">
-                  <span className="font-extrabold text-sky-400">₹{Number(rec.estimated_cost).toLocaleString('en-IN')}</span>
-                  <span className="text-[10px] text-slate-400 font-mono font-semibold px-2 py-0.5 rounded bg-slate-900 border border-slate-800">{rec.category || 'GENERAL'}</span>
+                <div className="text-[11px] text-slate-600 line-clamp-1">{rec.address || rec.location_address}</div>
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
+                  <span className="font-extrabold text-sky-700">₹{Number(rec.estimated_cost).toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] text-slate-600 font-mono font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">{rec.category || 'GENERAL'}</span>
                 </div>
               </div>
             ))}
@@ -132,15 +132,15 @@ export const MpDashboard: React.FC = () => {
         </Card>
 
         {/* Right Side: Constituency Work Locations (GIS PostGIS Plotting) */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-sm font-bold text-slate-100 flex items-center justify-between">
+        <Card className="lg:col-span-2 bg-white border-slate-200">
+          <CardHeader className="pb-3 border-b border-slate-100">
+            <CardTitle className="text-sm font-bold text-slate-900 flex items-center justify-between">
               <span>Constituency Work Locations (GIS PostGIS Plotting)</span>
-              <span className="text-xs text-slate-400 font-mono">{recommendations.length} Active Pins</span>
+              <span className="text-xs text-slate-500 font-mono">{recommendations.length} Active Pins</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <LeafletMap points={recommendations} />
+          <CardContent className="p-0">
+            <ConstituencyWorkMap works={recommendations} heightClass="h-[420px]" />
           </CardContent>
         </Card>
       </div>

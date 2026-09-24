@@ -44,24 +44,35 @@ export const SanctionModal: React.FC<SanctionModalProps> = ({
     try {
       // Persist in localStorage for instant cross-portal UI sync
       const recsStr = localStorage.getItem('mplads_submitted_recommendations');
-      if (recsStr) {
-        const recs = JSON.parse(recsStr);
-        const updatedRecs = recs.map((r: any) => {
-          if (r.id === recommendation.id) {
-            return {
-              ...r,
-              status: 'SANCTIONED',
-              sanctioned_amount: costNumber,
-              sanction_order_ref: sanctionRef,
-              assigned_ia: 'Public Works Department (PWD Division 1)',
-              target_completion_date: targetDate,
-              remarks: remarks,
-            };
-          }
-          return r;
+      const recs: any[] = recsStr ? JSON.parse(recsStr) : [];
+      let itemFound = false;
+      const updatedRecs = recs.map((r: any) => {
+        if (r.id === recommendation.id) {
+          itemFound = true;
+          return {
+            ...r,
+            status: 'SANCTIONED',
+            sanctioned_amount: costNumber,
+            sanction_order_ref: sanctionRef,
+            assigned_ia: 'Public Works Department (PWD Division 1)',
+            target_completion_date: targetDate,
+            remarks: remarks,
+          };
+        }
+        return r;
+      });
+      if (!itemFound) {
+        updatedRecs.push({
+          ...recommendation,
+          status: 'SANCTIONED',
+          sanctioned_amount: costNumber,
+          sanction_order_ref: sanctionRef,
+          assigned_ia: 'Public Works Department (PWD Division 1)',
+          target_completion_date: targetDate,
+          remarks: remarks,
         });
-        localStorage.setItem('mplads_submitted_recommendations', JSON.stringify(updatedRecs));
       }
+      localStorage.setItem('mplads_submitted_recommendations', JSON.stringify(updatedRecs));
 
       await daService.sanctionProject({
         project_id: recommendation.id,
@@ -87,52 +98,52 @@ export const SanctionModal: React.FC<SanctionModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={`Administrative Sanction Order - ${recommendation.title}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {errorMsg && (
-          <div className="p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-rose-300 text-xs flex items-center space-x-2">
-            <AlertCircle size={16} className="text-rose-400 shrink-0" />
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center space-x-2">
+            <AlertCircle size={16} className="text-rose-600 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1 text-xs">
-          <div className="text-slate-400">MP Original Estimate:</div>
-          <div className="text-sm font-extrabold text-sky-400">₹{Number(recommendation.estimated_cost).toLocaleString('en-IN')}</div>
-          <div className="text-slate-400">Sector: {recommendation.sector} | Quota: {recommendation.category || 'GENERAL'}</div>
+        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
+          <div className="text-slate-600 font-medium">MP Original Estimate:</div>
+          <div className="text-sm font-extrabold text-sky-700">₹{Number(recommendation.estimated_cost).toLocaleString('en-IN')}</div>
+          <div className="text-slate-600">Sector: {recommendation.sector} | Quota: {recommendation.category || 'GENERAL'}</div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Sanctioned Amount (INR ₹) *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Sanctioned Amount (INR ₹) *</label>
             <input
               type="number"
               required
               value={sanctionedAmount}
               onChange={(e) => setSanctionedAmount(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-bold text-sky-400"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-bold shadow-xs"
             />
             {isCostExceeded && (
-              <p className="text-[11px] text-amber-400 mt-1">Warning: Sanction amount exceeds original MP estimate.</p>
+              <p className="text-[11px] text-amber-800 font-medium mt-1">Warning: Sanction amount exceeds original MP estimate.</p>
             )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Sanction Order Reference No. *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Sanction Order Reference No. *</label>
             <input
               type="text"
               required
               value={sanctionRef}
               onChange={(e) => setSanctionRef(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-mono"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-mono shadow-xs"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Designated Implementing Agency *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Designated Implementing Agency *</label>
             <select
               value={agencyId}
               onChange={(e) => setAgencyId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-bold"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-medium shadow-xs"
             >
               <option value="c3333333-3333-3333-3333-333333333333">Public Works Department (PWD Division 1)</option>
               <option value="c4444444-4444-4444-4444-444444444444">Central Public Works Dept (CPWD)</option>
@@ -142,37 +153,37 @@ export const SanctionModal: React.FC<SanctionModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Target Completion Date *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Target Completion Date *</label>
             <input
               type="date"
               required
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-bold text-amber-300"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-bold shadow-xs"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">Upload Technical Sanction Order (PDF Document)</label>
-          <div className="border border-slate-800 bg-slate-950 rounded-lg p-3 text-center">
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Upload Technical Sanction Order (PDF Document)</label>
+          <div className="border border-slate-300 bg-slate-50 rounded-lg p-3 text-center">
             <input
               type="file"
               accept=".pdf"
               onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-              className="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer"
+              className="text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-700 cursor-pointer"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">Scrutiny & Feasibility Remarks</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Scrutiny & Feasibility Remarks</label>
           <textarea
             rows={3}
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
             placeholder="Verified technical feasibility and regional cost benchmarks..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 shadow-xs"
           />
         </div>
 

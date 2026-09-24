@@ -104,14 +104,14 @@ export const MinistryCaseWorkbench: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-6 rounded-2xl border border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-6 rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div className="flex items-center space-x-3">
-          <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <span className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200">
             <CheckSquare size={24} />
           </span>
           <div>
-            <h1 className="text-xl font-bold text-slate-100">MoSPI Ministry Case Workbench & Audit Trail</h1>
-            <p className="text-xs text-slate-400">
+            <h1 className="text-xl font-bold text-slate-900">MoSPI Ministry Case Workbench & Audit Trail</h1>
+            <p className="text-xs text-slate-600">
               National Ministry review of state-escalated cases, national fund freezes & Comptroller and Auditor General (CAG) audit actions
             </p>
           </div>
@@ -121,7 +121,7 @@ export const MinistryCaseWorkbench: React.FC = () => {
           variant="outline"
           onClick={fetchCases}
           disabled={loading}
-          className="flex items-center space-x-2 text-xs"
+          className="flex items-center space-x-2 text-xs border-slate-300 text-slate-700 hover:bg-slate-100"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           <span>Refresh</span>
@@ -129,37 +129,37 @@ export const MinistryCaseWorkbench: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
           {error}
         </div>
       )}
 
       {/* Cases Queue Table */}
-      <Card className="p-5 border-slate-800">
-        <h2 className="text-sm font-bold text-slate-100 mb-4">
+      <Card className="p-5 border-slate-200 bg-white shadow-xs">
+        <h2 className="text-sm font-bold text-slate-900 mb-4">
           National Ministry Escalated Cases Queue ({cases.length} Open Cases)
         </h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] font-semibold tracking-wider">
+            <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
               <tr>
-                <th className="p-3">Case Title & Work</th>
-                <th className="p-3">State & District</th>
-                <th className="p-3">SLA Status</th>
-                <th className="p-3">Risk Score</th>
-                <th className="p-3">Next Required Ministry Action</th>
-                <th className="p-3 text-right">Review Action</th>
+                <th className="p-3 font-bold">Case Title & Work</th>
+                <th className="p-3 font-bold">State & District</th>
+                <th className="p-3 font-bold">SLA Status</th>
+                <th className="p-3 font-bold">Risk Score</th>
+                <th className="p-3 font-bold">Next Required Ministry Action</th>
+                <th className="p-3 text-right font-bold">Review Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-300">
+            <tbody className="divide-y divide-slate-100 text-slate-800">
               {cases.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-900/30 transition-colors">
+                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-3">
-                    <div className="font-semibold text-slate-200">{c.title}</div>
-                    <div className="text-[11px] text-slate-400">{c.address}</div>
+                    <div className="font-bold text-slate-900">{c.title}</div>
+                    <div className="text-[11px] text-slate-600">{c.address}</div>
                   </td>
-                  <td className="p-3 text-slate-300 font-medium">{c.state_name} / {c.district_name}</td>
+                  <td className="p-3 text-slate-700 font-medium">{c.state_name} / {c.district_name}</td>
                   <td className="p-3">
                     <Badge variant={c.is_sla_breached ? 'danger' : 'info'}>
                       {c.sla_status} ({c.case_age_days || 14} days)
@@ -170,13 +170,13 @@ export const MinistryCaseWorkbench: React.FC = () => {
                       {c.risk_score} ({c.risk_level})
                     </Badge>
                   </td>
-                  <td className="p-3 text-slate-300">{c.next_action}</td>
+                  <td className="p-3 text-slate-800 font-medium">{c.next_action}</td>
                   <td className="p-3 text-right">
                     <div className="flex items-center justify-end space-x-2">
                       <Button
                         variant="secondary"
                         onClick={() => navigate(`/central/scrutiny/${c.id}`)}
-                        className="text-xs bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 border border-sky-500/30 flex items-center space-x-1"
+                        className="text-xs bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 flex items-center space-x-1 font-semibold"
                       >
                         <ShieldCheck size={14} />
                         <span>Deep Scrutiny</span>
@@ -184,7 +184,7 @@ export const MinistryCaseWorkbench: React.FC = () => {
                       <Button
                         variant="secondary"
                         onClick={() => { setSelectedCase(c); setActionResult(null); setActionNotes(''); }}
-                        className="text-xs bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 border border-indigo-500/30"
+                        className="text-xs bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200 font-semibold"
                       >
                         Review Case
                       </Button>
@@ -199,76 +199,76 @@ export const MinistryCaseWorkbench: React.FC = () => {
 
       {/* Case Review Modal */}
       {selectedCase && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2 text-slate-100 font-bold text-base">
-                <ShieldAlert size={20} className="text-indigo-400" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-white border border-slate-200 rounded-2xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center space-x-2 text-slate-900 font-bold text-base">
+                <ShieldAlert size={20} className="text-indigo-700" />
                 <span>MoSPI Ministry Case Review — {selectedCase.title}</span>
               </div>
               <button
                 onClick={() => setSelectedCase(null)}
-                className="text-slate-400 hover:text-slate-200 text-lg font-bold"
+                className="text-slate-400 hover:text-slate-700 text-lg font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-300">
-              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800">
+            <div className="space-y-3 text-xs text-slate-800">
+              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
-                  <span className="text-slate-500">Escalated From:</span>
-                  <div className="font-semibold text-slate-200 mt-0.5">{selectedCase.escalated_from}</div>
+                  <span className="text-slate-600 font-semibold">Escalated From:</span>
+                  <div className="font-bold text-slate-900 mt-0.5">{selectedCase.escalated_from}</div>
                 </div>
                 <div>
-                  <span className="text-slate-500">ML Risk Score:</span>
-                  <div className="font-bold text-rose-400 mt-0.5">{selectedCase.risk_score} ({selectedCase.risk_level})</div>
+                  <span className="text-slate-600 font-semibold">ML Risk Score:</span>
+                  <div className="font-extrabold text-rose-700 mt-0.5">{selectedCase.risk_score} ({selectedCase.risk_level})</div>
                 </div>
               </div>
 
               {/* TRANSFERRED CASE EVIDENCE SUMMARY */}
-              <div className="p-3 bg-indigo-950/30 border border-indigo-500/30 rounded-xl space-y-2 text-[11px]">
-                <div className="font-bold text-indigo-300 flex items-center justify-between">
+              <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2 text-[11px]">
+                <div className="font-bold text-indigo-900 flex items-center justify-between">
                   <span>Transferred National Evidence Dossier (DA → State → Central)</span>
-                  <span className="text-emerald-400 font-mono">CHAIN OF CUSTODY: VERIFIED</span>
+                  <span className="text-emerald-700 font-mono font-bold">CHAIN OF CUSTODY: VERIFIED</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-300">
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                    <span className="text-slate-500 block">Site Evidence Photos:</span>
-                    <strong className="text-slate-200">2 IA Photos (ConvNet + pHash Fingerprints)</strong>
+                <div className="grid grid-cols-2 gap-2 text-slate-800">
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 block font-medium">Site Evidence Photos:</span>
+                    <strong className="text-slate-900 font-bold">2 IA Photos (ConvNet + pHash Fingerprints)</strong>
                   </div>
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                    <span className="text-slate-500 block">OCR Financial Voucher:</span>
-                    <strong className="text-slate-200">Bill Date & Sanction Price Verified (₹25,00,000)</strong>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 block font-medium">OCR Financial Voucher:</span>
+                    <strong className="text-slate-900 font-bold">Bill Date & Sanction Price Verified (₹25,00,000)</strong>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Ministry Officer Order / Audit Justification</label>
+                <label className="block text-slate-700 font-bold mb-1">Ministry Officer Order / Audit Justification</label>
                 <textarea
                   value={actionNotes}
                   onChange={(e) => setActionNotes(e.target.value)}
                   placeholder="Enter MoSPI Joint Secretary review order or audit instructions..."
                   rows={3}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white"
                 />
               </div>
 
               {actionResult && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-medium text-xs">
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-xs">
                   {actionResult}
                 </div>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-200">
               <Button
                 variant="secondary"
                 disabled={actionLoading}
                 onClick={() => handleExecuteAction('FREEZE_FUNDS')}
-                className="text-xs bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600/30"
+                className="text-xs bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 font-semibold"
               >
                 Freeze Installment Funds
               </Button>
@@ -276,7 +276,7 @@ export const MinistryCaseWorkbench: React.FC = () => {
                 variant="secondary"
                 disabled={actionLoading}
                 onClick={() => handleExecuteAction('CLEAR_NATIONAL_CASE')}
-                className="text-xs bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30"
+                className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold"
               >
                 Clear National Case
               </Button>
@@ -284,7 +284,7 @@ export const MinistryCaseWorkbench: React.FC = () => {
                 variant="secondary"
                 disabled={actionLoading}
                 onClick={() => handleExecuteAction('REQUEST_STATE_REPORT')}
-                className="text-xs bg-sky-600/20 text-sky-300 border border-sky-500/30 hover:bg-sky-600/30"
+                className="text-xs bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 font-semibold"
               >
                 Request State Compliance Report
               </Button>
@@ -292,7 +292,7 @@ export const MinistryCaseWorkbench: React.FC = () => {
                 variant="secondary"
                 disabled={actionLoading}
                 onClick={() => handleExecuteAction('MARK_NATIONAL_AUDIT')}
-                className="text-xs bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30"
+                className="text-xs bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 font-semibold"
               >
                 Mark CAG Audit
               </Button>
@@ -300,7 +300,7 @@ export const MinistryCaseWorkbench: React.FC = () => {
                 variant="secondary"
                 disabled={actionLoading}
                 onClick={() => handleExecuteAction('RETURN_TO_STATE')}
-                className="text-xs bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30"
+                className="text-xs bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 font-semibold"
               >
                 Return to State Nodal Authority
               </Button>

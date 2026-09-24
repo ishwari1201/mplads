@@ -26,10 +26,13 @@ export interface IaEvidenceRequest {
   work_id: string;
   work_id_code?: string;
   work_title?: string;
-  evidence_type: string;
+  evidence_type?: string;
+  request_type?: string;
   status: string;
-  reason: string;
-  requested_by: string;
+  reason?: string;
+  notes?: string;
+  response_notes?: string;
+  requested_by?: string;
   deadline?: string;
 }
 

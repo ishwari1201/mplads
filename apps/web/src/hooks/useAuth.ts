@@ -6,7 +6,21 @@ const AUTH_EVENT_NAME = 'mplads_auth_change';
 export function useAuth() {
   const getSavedUser = (): User | null => {
     const saved = localStorage.getItem('mplads_user');
-    return saved ? JSON.parse(saved) : {
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    // If user explicitly logged out, do not return mock default
+    const loggedOut = sessionStorage.getItem('mplads_logged_out');
+    if (loggedOut === 'true') {
+      return null;
+    }
+
+    return {
       id: '11111111-1111-1111-1111-111111111111',
       email: 'mp.mumbai@mplads.gov.in',
       full_name: 'Hon. Rajesh Sharma (MP)',
@@ -30,6 +44,7 @@ export function useAuth() {
   }, []);
 
   const loginAsRole = (role: UserRole) => {
+    sessionStorage.removeItem('mplads_logged_out');
     let mockUser: User;
     switch (role) {
       case 'MP':
@@ -66,6 +81,7 @@ export function useAuth() {
   const logout = () => {
     localStorage.removeItem('mplads_user');
     localStorage.removeItem('mplads_token');
+    sessionStorage.setItem('mplads_logged_out', 'true');
     setUser(null);
     window.dispatchEvent(new Event(AUTH_EVENT_NAME));
   };

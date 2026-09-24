@@ -95,58 +95,58 @@ export const RecommendationForm: React.FC = () => {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">Submit Work Recommendation</h2>
-          <p className="text-xs text-slate-400">MPLADS Statutory Proposal Submission Form with SLA Schedule Control</p>
+          <h2 className="text-2xl font-bold text-slate-900">Submit Work Recommendation</h2>
+          <p className="text-xs text-slate-600">MPLADS Statutory Proposal Submission Form with SLA Schedule Control</p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => navigate('/mp')}>Back to Dashboard</Button>
       </div>
 
       {errorMsg && (
-        <div className="p-4 bg-rose-950/60 border border-rose-500/50 rounded-xl text-rose-300 text-xs flex items-center space-x-3">
-          <AlertTriangle size={20} className="shrink-0 text-rose-400" />
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center space-x-3">
+          <AlertTriangle size={20} className="shrink-0 text-rose-600" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {successResult && (
-        <Card className="border-emerald-500/50 bg-emerald-950/30">
+        <Card className="border-emerald-300 bg-emerald-50">
           <CardContent className="pt-4 space-y-2">
-            <div className="flex items-center space-x-2 text-emerald-400 font-bold text-sm">
+            <div className="flex items-center space-x-2 text-emerald-800 font-bold text-sm">
               <CheckCircle2 size={20} />
               <span>Recommendation Submitted & Registered in PostGIS Database!</span>
             </div>
-            <p className="text-xs text-slate-300">Project ID: {successResult.project.id}</p>
+            <p className="text-xs text-slate-700">Project ID: {successResult.project.id}</p>
           </CardContent>
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex items-center justify-between text-slate-900">
             <span>Project Proposal Specification</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Work Title / Project Name *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Work Title / Project Name *</label>
               <input
                 type="text"
                 required
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="e.g., Installation of Solar RO Drinking Water Plant in Colaba School"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 shadow-xs"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Sector Category *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Sector Category *</label>
                 <select
                   value={form.sector}
                   onChange={(e) => setForm({ ...form, sector: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-xs font-medium"
                 >
                   <option value="Drinking Water Facilities">Drinking Water Facilities</option>
                   <option value="Sanitation & Public Toilets">Sanitation & Public Toilets</option>
@@ -157,11 +157,11 @@ export const RecommendationForm: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Target Category Quota *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Category Quota *</label>
                 <select
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-xs font-medium"
                 >
                   <option value="GENERAL">GENERAL Public Infrastructure</option>
                   <option value="SC">SC Reserved Quota (15% Min)</option>
@@ -170,27 +170,27 @@ export const RecommendationForm: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Estimated Budget (INR ₹) *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Estimated Budget (INR ₹) *</label>
                 <input
                   type="number"
                   required
                   value={form.estimated_cost}
                   onChange={(e) => setForm({ ...form, estimated_cost: e.target.value })}
                   placeholder="e.g. 2500000"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 shadow-xs"
                 />
               </div>
 
               {/* STATUTORY SLA TARGET COMPLETION SCHEDULE INPUT */}
               <div>
-                <label className="block text-xs font-semibold text-amber-400 mb-1 flex items-center space-x-1">
+                <label className="block text-xs font-semibold text-amber-800 mb-1 flex items-center space-x-1">
                   <Clock size={14} />
                   <span>Statutory SLA Target Schedule *</span>
                 </label>
                 <select
                   value={form.sla_target_days}
                   onChange={(e) => setForm({ ...form, sla_target_days: e.target.value })}
-                  className="w-full bg-slate-950 border border-amber-500/40 rounded-lg px-3 py-2.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500 font-bold"
+                  className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2.5 text-xs text-amber-900 focus:outline-none focus:border-amber-500 font-bold shadow-xs"
                 >
                   <option value="45">45 Days (Fast-Track Schedule)</option>
                   <option value="60">60 Days (Accelerated Schedule)</option>
@@ -203,7 +203,7 @@ export const RecommendationForm: React.FC = () => {
 
             {/* INTERACTIVE GIS MAP LOCATION PICKER */}
             <div className="space-y-2 pt-1">
-              <label className="block text-xs font-semibold text-sky-400 flex items-center space-x-1.5">
+              <label className="block text-xs font-semibold text-sky-800 flex items-center space-x-1.5">
                 <MapPin size={14} />
                 <span>GIS Work Site Location Picker (Search & Click Pin to Auto-Fill Coordinates)</span>
               </label>
@@ -215,49 +215,49 @@ export const RecommendationForm: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Physical Location Address *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Physical Location Address *</label>
               <input
                 type="text"
                 required
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 placeholder="e.g. Municipal Secondary School Grounds, Ward 4, Fort, Mumbai"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 shadow-xs"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Latitude Coordinate</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Latitude Coordinate</label>
                 <input
                   type="text"
                   value={form.latitude}
                   onChange={(e) => setForm({ ...form, latitude: e.target.value })}
                   placeholder="18.9067"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 font-mono shadow-xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Longitude Coordinate</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Longitude Coordinate</label>
                 <input
                   type="text"
                   value={form.longitude}
                   onChange={(e) => setForm({ ...form, longitude: e.target.value })}
                   placeholder="72.8258"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 font-mono shadow-xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Detailed Technical Description & Scope *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Detailed Technical Description & Scope *</label>
               <textarea
                 rows={4}
                 required
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Describe intended beneficiaries, scope of work, technical components, and public utility..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 shadow-xs"
               />
             </div>
 

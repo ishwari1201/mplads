@@ -47,24 +47,24 @@ export const DistrictMonitoring: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-6 rounded-2xl border border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center space-x-3">
           {selectedDistrict && (
             <button
               onClick={() => { setSelectedDistrict(null); setDistrictWorks([]); }}
-              className="p-2 rounded-xl bg-slate-900 text-slate-300 hover:bg-slate-800 transition-all"
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all"
             >
               <ArrowLeft size={18} />
             </button>
           )}
-          <span className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+          <span className="p-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200">
             <Building2 size={24} />
           </span>
           <div>
-            <h1 className="text-xl font-bold text-slate-100">
+            <h1 className="text-xl font-bold text-slate-900">
               {selectedDistrict ? `${selectedDistrict.district_name} Collectorate Monitoring` : 'District Monitoring Directory'}
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600 font-medium">
               {selectedDistrict ? `Collector: ${selectedDistrict.collector_name} | State: ${selectedDistrict.state_name}` : 'Statewide performance, SLA compliance and risk concentration by district'}
             </p>
           </div>
@@ -82,7 +82,7 @@ export const DistrictMonitoring: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
           {error}
         </div>
       )}
@@ -90,29 +90,29 @@ export const DistrictMonitoring: React.FC = () => {
       {/* District Drill-down View */}
       {selectedDistrict ? (
         <div className="space-y-6">
-          <Card className="p-5 border-slate-800">
-            <h2 className="text-sm font-bold text-slate-200 mb-2">District Collectorate Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-300">
+          <Card className="p-5 border-slate-200 bg-white shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 mb-2">District Collectorate Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-700">
               <div>
-                <span className="text-slate-500">District Office Address:</span>
-                <p className="font-semibold text-slate-200 mt-0.5">{selectedDistrict.office_address || 'District Collectorate Office, Fort, Mumbai'}</p>
+                <span className="text-slate-500 font-semibold">District Office Address:</span>
+                <p className="font-semibold text-slate-900 mt-0.5">{selectedDistrict.office_address || 'District Collectorate Office, Fort, Mumbai'}</p>
               </div>
               <div>
-                <span className="text-slate-500">Collector Name:</span>
-                <p className="font-semibold text-slate-200 mt-0.5">{selectedDistrict.collector_name}</p>
+                <span className="text-slate-500 font-semibold">Collector Name:</span>
+                <p className="font-semibold text-slate-900 mt-0.5">{selectedDistrict.collector_name}</p>
               </div>
               <div>
-                <span className="text-slate-500">Total Assigned Works:</span>
-                <p className="font-semibold text-purple-400 mt-0.5">{districtWorks.length} Works</p>
+                <span className="text-slate-500 font-semibold">Total Assigned Works:</span>
+                <p className="font-bold text-purple-800 mt-0.5">{districtWorks.length} Works</p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-5 border-slate-800">
-            <h2 className="text-sm font-bold text-slate-200 mb-4">Works Registered under {selectedDistrict.district_name}</h2>
+          <Card className="p-5 border-slate-200 bg-white shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 mb-4">Works Registered under {selectedDistrict.district_name}</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] font-semibold tracking-wider">
+                <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-y border-slate-200 tracking-wider">
                   <tr>
                     <th className="p-3">Title & Location</th>
                     <th className="p-3">Sector</th>
@@ -122,15 +122,15 @@ export const DistrictMonitoring: React.FC = () => {
                     <th className="p-3 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300">
+                <tbody className="divide-y divide-slate-200 text-slate-700">
                   {districtWorks.map((w) => (
-                    <tr key={w.id} className="hover:bg-slate-900/30 transition-colors">
+                    <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3">
-                        <div className="font-semibold text-slate-200">{w.title}</div>
-                        <div className="text-[11px] text-slate-400">{w.address}</div>
+                        <div className="font-semibold text-slate-900">{w.title}</div>
+                        <div className="text-[11px] text-slate-600">{w.address}</div>
                       </td>
-                      <td className="p-3 text-slate-300">{w.sector}</td>
-                      <td className="p-3 font-medium">₹{Number(w.sanctioned_amount || w.estimated_cost).toLocaleString('en-IN')}</td>
+                      <td className="p-3 text-slate-700 font-medium">{w.sector}</td>
+                      <td className="p-3 font-bold text-slate-900">₹{Number(w.sanctioned_amount || w.estimated_cost).toLocaleString('en-IN')}</td>
                       <td className="p-3">
                         <Badge variant={w.status === 'SANCTIONED' || w.status === 'IN_PROGRESS' ? 'success' : 'warning'}>
                           {w.status}
@@ -154,7 +154,7 @@ export const DistrictMonitoring: React.FC = () => {
                           </Button>
                           <button
                             onClick={() => navigate(`/state/work/${w.id}`)}
-                            className="text-sky-400 hover:text-sky-300 font-semibold flex items-center space-x-1 text-xs"
+                            className="text-sky-700 hover:text-sky-900 font-bold flex items-center space-x-1 text-xs"
                           >
                             <span>Work Detail</span>
                             <Eye size={12} />
@@ -172,31 +172,31 @@ export const DistrictMonitoring: React.FC = () => {
         /* Districts Cards Grid */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {districts.map((d) => (
-            <Card key={d.district_id} className="p-5 border-slate-800 space-y-4 hover:border-purple-500/40 transition-all">
+            <Card key={d.district_id} className="p-5 border-slate-200 bg-white space-y-4 hover:border-purple-400 transition-all shadow-xs">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-slate-100">{d.district_name}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{d.collector_name}</p>
+                  <h3 className="text-base font-bold text-slate-900">{d.district_name}</h3>
+                  <p className="text-xs text-slate-600 font-medium mt-0.5">{d.collector_name}</p>
                 </div>
                 <Badge variant="purple">{d.state_name}</Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-900">
-                <div className="p-2 rounded bg-slate-900">
-                  <span className="text-slate-500 text-[10px] uppercase">Total Works</span>
-                  <div className="font-bold text-slate-200 mt-0.5">{d.total_works}</div>
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200">
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Total Works</span>
+                  <div className="font-bold text-slate-900 mt-0.5">{d.total_works}</div>
                 </div>
-                <div className="p-2 rounded bg-slate-900">
-                  <span className="text-slate-500 text-[10px] uppercase">Active Executing</span>
-                  <div className="font-bold text-emerald-400 mt-0.5">{d.active_works}</div>
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Active Executing</span>
+                  <div className="font-bold text-emerald-700 mt-0.5">{d.active_works}</div>
                 </div>
-                <div className="p-2 rounded bg-slate-900">
-                  <span className="text-slate-500 text-[10px] uppercase">SLA Breached</span>
-                  <div className="font-bold text-amber-400 mt-0.5">{d.delayed_works}</div>
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">SLA Breached</span>
+                  <div className="font-bold text-amber-800 mt-0.5">{d.delayed_works}</div>
                 </div>
-                <div className="p-2 rounded bg-slate-900">
-                  <span className="text-slate-500 text-[10px] uppercase">High Risk Works</span>
-                  <div className="font-bold text-rose-400 mt-0.5">{d.high_critical_risk_count}</div>
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 text-[10px] uppercase font-semibold">High Risk Works</span>
+                  <div className="font-bold text-rose-700 mt-0.5">{d.high_critical_risk_count}</div>
                 </div>
               </div>
 

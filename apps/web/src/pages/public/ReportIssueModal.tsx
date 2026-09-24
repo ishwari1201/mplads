@@ -152,16 +152,16 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
     <Modal isOpen={isOpen} onClose={resetAndClose} title="Report Ground Observation / Work Issue">
       {submissionResult ? (
         <div className="p-5 space-y-4">
-          <div className="p-5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-center space-y-3">
-            <CheckCircle2 size={44} className="mx-auto text-emerald-400" />
-            <h4 className="text-base font-bold text-slate-100">Thank You for Your Feedback</h4>
-            <p className="text-xs text-slate-300 leading-relaxed">
+          <div className="p-5 bg-emerald-50 border border-emerald-300 rounded-xl text-center space-y-3">
+            <CheckCircle2 size={44} className="mx-auto text-emerald-600" />
+            <h4 className="text-base font-bold text-slate-900">Thank You for Your Feedback</h4>
+            <p className="text-xs text-slate-700 leading-relaxed font-medium">
               Your observation report has been successfully recorded in the PostgreSQL database and forwarded to the government authority for physical ground review.
             </p>
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button variant="gold" onClick={resetAndClose} className="px-6 text-xs">
+            <Button variant="gold" onClick={resetAndClose} className="px-6 text-xs font-bold">
               Close Window
             </Button>
           </div>
@@ -169,8 +169,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* CITIZEN POLICY BANNER */}
-          <div className="p-3 bg-sky-950/40 border border-sky-500/30 rounded-xl flex items-start space-x-2 text-sky-200 text-xs leading-relaxed">
-            <Info size={18} className="text-sky-400 shrink-0 mt-0.5" />
+          <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl flex items-start space-x-2 text-sky-900 text-xs leading-relaxed font-medium">
+            <Info size={18} className="text-sky-600 shrink-0 mt-0.5" />
             <div>
               <strong>LOCATION & PRIVACY POLICY:</strong> Browser GPS is completely optional. You can report on any work regardless of your location. Your feedback provides ground reality context for public transparency.
             </div>
@@ -181,10 +181,10 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
             <button
               type="button"
               onClick={() => setReportType('KNOWN_WORK')}
-              className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center space-x-2 transition-all ${
+              className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all ${
                 reportType === 'KNOWN_WORK'
-                  ? 'bg-sky-500/20 border-sky-500 text-sky-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                  ? 'bg-sky-50 border-sky-500 text-sky-800 shadow-2xs'
+                  : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
               }`}
             >
               <FileText size={16} />
@@ -194,10 +194,10 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
             <button
               type="button"
               onClick={() => setReportType('UNLISTED_WORK')}
-              className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center space-x-2 transition-all ${
+              className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all ${
                 reportType === 'UNLISTED_WORK'
-                  ? 'bg-purple-500/20 border-purple-500 text-purple-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                  ? 'bg-purple-50 border-purple-500 text-purple-800 shadow-2xs'
+                  : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
               }`}
             >
               <AlertTriangle size={16} />
@@ -208,14 +208,14 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
           {/* WORK SELECTOR IF KNOWN WORK */}
           {reportType === 'KNOWN_WORK' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
                 Select Public MPLADS Work
               </label>
               {availableWorks.length > 0 ? (
                 <select
                   value={selectedWorkId}
                   onChange={(e) => setSelectedWorkId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white font-medium"
                 >
                   <option value="">-- Select Work from Directory --</option>
                   {availableWorks.map((w) => (
@@ -230,7 +230,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
                   placeholder="Enter Work ID or Work Title"
                   value={selectedWorkId}
                   onChange={(e) => setSelectedWorkId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white font-medium"
                 />
               )}
             </div>
@@ -238,13 +238,13 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
 
           {/* CITIZEN OBSERVATION CATEGORY */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               What do you observe on the ground?
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white font-medium"
             >
               {CITIZEN_OBSERVATION_CATEGORIES.map((cat) => (
                 <option key={cat.value} value={cat.value}>
@@ -256,7 +256,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
 
           {/* DESCRIPTION */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               Detailed Description of Ground Reality
             </label>
             <textarea
@@ -265,15 +265,15 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what you see at the site (e.g., work claims to be complete but construction is unfinished, site missing signboard, etc.)"
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white font-medium"
             />
           </div>
 
           {/* OPTIONAL CITIZEN GPS ATTACHMENT */}
-          <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
-                <Navigation size={14} className="text-sky-400" />
+              <span className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+                <Navigation size={14} className="text-sky-600" />
                 <span>Attach Current Location (Optional Context)</span>
               </span>
               <Button
@@ -282,28 +282,28 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
                 size="sm"
                 onClick={requestBrowserGps}
                 disabled={gpsLoading}
-                className="text-[11px] py-1 h-7"
+                className="text-[11px] py-1 h-7 border-slate-300 text-slate-700 font-semibold"
               >
                 {gpsLoading ? 'Capturing...' : citizenLat !== null ? 'Re-capture GPS' : 'Attach My GPS'}
               </Button>
             </div>
-            {gpsMessage && <p className="text-[11px] text-sky-400 font-mono">{gpsMessage}</p>}
+            {gpsMessage && <p className="text-[11px] text-sky-700 font-mono font-semibold">{gpsMessage}</p>}
           </div>
 
           {/* OPTIONAL PHOTO ATTACHMENT */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center space-x-1">
-              <Camera size={14} className="text-sky-400" />
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1">
+              <Camera size={14} className="text-sky-600" />
               <span>Attach Site Photo (Optional)</span>
             </label>
             <input
               type="file"
               accept="image/*"
               onChange={handlePhotoChange}
-              className="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-950 file:text-sky-300 hover:file:bg-sky-900 cursor-pointer"
+              className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
             />
             {photoPreview && (
-              <div className="mt-2 relative w-24 h-24 rounded-lg overflow-hidden border border-slate-700">
+              <div className="mt-2 relative w-24 h-24 rounded-lg overflow-hidden border border-slate-300">
                 <img src={photoPreview} alt="Site preview" className="w-full h-full object-cover" />
               </div>
             )}
@@ -312,33 +312,33 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({
           {/* REPORTER INFO (OPTIONAL) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Your Name (Optional)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Your Name (Optional)</label>
               <input
                 type="text"
                 value={reporterName}
                 onChange={(e) => setReporterName(e.target.value)}
                 placeholder="Anonymous Citizen"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white font-medium"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Email / Phone (Optional)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Email / Phone (Optional)</label>
               <input
                 type="email"
                 value={reporterEmail}
                 onChange={(e) => setReporterEmail(e.target.value)}
                 placeholder="citizen@example.com"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white font-medium"
               />
             </div>
           </div>
 
           {/* FORM ACTIONS */}
-          <div className="flex justify-end space-x-3 pt-3 border-t border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={resetAndClose}>
+          <div className="flex justify-end space-x-3 pt-3 border-t border-slate-200">
+            <Button type="button" variant="outline" size="sm" onClick={resetAndClose} className="border-slate-300 text-slate-700">
               Cancel
             </Button>
-            <Button type="submit" variant="gold" size="sm" disabled={loading} className="px-5">
+            <Button type="submit" variant="gold" size="sm" disabled={loading} className="px-5 font-bold">
               {loading ? 'Submitting...' : 'Submit Ground Report'}
             </Button>
           </div>

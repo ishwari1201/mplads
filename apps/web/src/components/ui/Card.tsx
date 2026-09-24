@@ -8,7 +8,7 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, className = '', hoverEffect = true }) => {
   return (
-    <div className={`glass-card rounded-xl p-6 ${hoverEffect ? 'glass-card-hover' : ''} ${className}`}>
+    <div className={`bg-white border border-slate-200/90 rounded-xl shadow-xs p-6 ${hoverEffect ? 'hover:shadow-md hover:border-sky-300 transition-all duration-200' : ''} ${className}`}>
       {children}
     </div>
   );
@@ -19,11 +19,11 @@ export const CardHeader: React.FC<{ children: React.ReactNode; className?: strin
 );
 
 export const CardTitle: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <h3 className={`text-lg font-semibold text-slate-100 ${className}`}>{children}</h3>
+  <h3 className={`text-base font-bold text-slate-900 ${className}`}>{children}</h3>
 );
 
 export const CardDescription: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <p className={`text-xs text-slate-400 ${className}`}>{children}</p>
+  <p className={`text-xs text-slate-500 ${className}`}>{children}</p>
 );
 
 export const CardContent: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (

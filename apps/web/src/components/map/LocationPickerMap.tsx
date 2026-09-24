@@ -172,19 +172,19 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       {/* SEARCH LOCATION BAR */}
       <form onSubmit={handleSearch} className="relative flex items-center space-x-2">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-3 text-slate-500" />
+          <Search size={14} className="absolute left-3 top-3 text-slate-400" />
           <input
             type="text"
             placeholder="Search city, ward, area, or landmark (e.g. Fort, Mumbai, Pune, Colaba)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-600 focus:bg-white"
           />
         </div>
         <button
           type="submit"
           disabled={searching}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center space-x-1.5"
+          className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center space-x-1.5 shadow-xs"
         >
           {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           <span>{searching ? 'Searching...' : 'Search Map'}</span>
@@ -193,8 +193,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
 
       {/* LIVE SUGGESTIONS DROPDOWN (GAZETTEER & ONLINE API RESULTS) */}
       {(localMatches.length > 0 || searchResults.length > 0) && (
-        <div className="p-2 bg-slate-900 border border-sky-500/40 rounded-xl max-h-48 overflow-y-auto space-y-1 text-xs shadow-2xl relative z-20">
-          <div className="text-[10px] font-bold text-sky-400 uppercase tracking-wider px-2 py-1">
+        <div className="p-2 bg-white border border-sky-300 rounded-xl max-h-48 overflow-y-auto space-y-1 text-xs shadow-xl relative z-20 divide-y divide-slate-100">
+          <div className="text-[10px] font-bold text-sky-800 uppercase tracking-wider px-2 py-1">
             Matching Map Locations (Click to Pan Pin & Auto-Fill Coordinates)
           </div>
           {localMatches.slice(0, 4).map((item, idx) => (
@@ -202,12 +202,12 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
               key={`local-${idx}`}
               type="button"
               onClick={() => selectItem(item.lat, item.lng, item.address)}
-              className="w-full text-left p-2 hover:bg-sky-950/60 rounded-lg text-slate-200 flex items-start space-x-2 text-[11px] transition-colors border border-transparent hover:border-sky-500/30"
+              className="w-full text-left p-2 hover:bg-sky-50 rounded-lg text-slate-800 flex items-start space-x-2 text-[11px] transition-colors"
             >
-              <MapPin size={14} className="text-sky-400 shrink-0 mt-0.5" />
+              <MapPin size={14} className="text-sky-700 shrink-0 mt-0.5" />
               <div>
-                <div className="font-bold text-slate-100">{item.name}</div>
-                <div className="text-[10px] text-slate-400 font-mono">{item.lat}° N, {item.lng}° E</div>
+                <div className="font-bold text-slate-900">{item.name}</div>
+                <div className="text-[10px] text-slate-600 font-mono font-medium">{item.lat}° N, {item.lng}° E</div>
               </div>
             </button>
           ))}
@@ -217,12 +217,12 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
               key={`api-${idx}`}
               type="button"
               onClick={() => selectItem(item.lat, item.lon, item.display_name)}
-              className="w-full text-left p-2 hover:bg-sky-950/60 rounded-lg text-slate-200 flex items-start space-x-2 text-[11px] transition-colors border border-transparent hover:border-sky-500/30"
+              className="w-full text-left p-2 hover:bg-sky-50 rounded-lg text-slate-800 flex items-start space-x-2 text-[11px] transition-colors"
             >
-              <MapPin size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+              <MapPin size={14} className="text-emerald-700 shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-slate-200 line-clamp-1">{item.display_name}</div>
-                <div className="text-[10px] text-slate-400 font-mono">{item.lat.toFixed(4)}° N, {item.lon.toFixed(4)}° E</div>
+                <div className="font-semibold text-slate-900 line-clamp-1">{item.display_name}</div>
+                <div className="text-[10px] text-slate-600 font-mono font-medium">{item.lat.toFixed(4)}° N, {item.lon.toFixed(4)}° E</div>
               </div>
             </button>
           ))}
@@ -230,7 +230,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       )}
 
       {/* INTERACTIVE LEAFLET MAP */}
-      <div className="w-full h-[300px] rounded-xl overflow-hidden border border-slate-800 relative z-0 shadow-lg">
+      <div className="w-full h-[300px] rounded-xl overflow-hidden border border-slate-300 relative z-0 shadow-xs">
         <MapContainer center={[currentLat, currentLng]} zoom={13} scrollWheelZoom={false} className="w-full h-full">
           <ChangeView center={[currentLat, currentLng]} />
           <TileLayer
@@ -254,13 +254,13 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       </div>
 
       {/* COORDINATE AUTO-FILL CONFIRMATION BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 text-[11px] bg-slate-950 p-3 rounded-xl border border-sky-500/30">
-        <span className="flex items-center space-x-1.5 text-slate-300">
-          <CheckCircle2 size={14} className="text-emerald-400" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <span className="flex items-center space-x-1.5 text-slate-700">
+          <CheckCircle2 size={14} className="text-emerald-700" />
           <span>Searching location or clicking map pin auto-fills Latitude & Longitude in inputs below.</span>
         </span>
         {selectedLat !== null && selectedLng !== null && (
-          <span className="font-mono font-bold text-sky-300 px-2.5 py-1 rounded bg-sky-950 border border-sky-500/40 shrink-0">
+          <span className="font-mono font-bold text-sky-800 px-2.5 py-1 rounded bg-white border border-sky-300 shadow-2xs shrink-0">
             Lat: {selectedLat.toFixed(6)}° N | Lng: {selectedLng.toFixed(6)}° E
           </span>
         )}

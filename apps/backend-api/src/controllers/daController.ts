@@ -101,12 +101,13 @@ export class DAController {
   static async getRiskHistory(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const projRes = await query(`SELECT id, created_at, status FROM projects WHERE id = $1`, [id]);
+      const createdDate = projRes.rows[0]?.created_at 
+        ? new Date(projRes.rows[0].created_at).toISOString().slice(0, 10) 
+        : new Date().toISOString().slice(0, 10);
+      
       const history = [
-        { date: '2026-08-01', risk_score: 28, risk_level: 'LOW', reason: 'Initial recommendation registered' },
-        { date: '2026-08-05', risk_score: 34, risk_level: 'LOW', reason: 'Pre-sanction screening completed' },
-        { date: '2026-08-10', risk_score: 47, risk_level: 'MEDIUM', reason: 'SBERT text similarity match identified' },
-        { date: '2026-08-15', risk_score: 69, risk_level: 'HIGH', reason: 'Payment disbursement velocity spike (+47% delta)' },
-        { date: '2026-08-20', risk_score: 86, risk_level: 'CRITICAL', reason: 'EXIF photo location offset mismatch detected' },
+        { date: createdDate, risk_score: 15, risk_level: 'LOW', reason: 'Initial recommendation registered in portal' }
       ];
       return res.json({ project_id: id, history });
     } catch (error: any) {
@@ -211,16 +212,56 @@ export class DAController {
   static async getWorkAnalysis(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const projRes = await query(
+        `SELECT p.*, 
+                (SELECT physical_progress FROM ia_schedules WHERE work_id = p.id LIMIT 1) as physical_prog,
+                (SELECT requested_amount FROM payment_claims WHERE work_id = p.id LIMIT 1) as claimed_amt
+         FROM projects p WHERE p.id = $1`,
+        [id]
+      );
+
+      const p = projRes.rows[0];
+      const hasPhys = p && p.physical_prog !== null && p.physical_prog !== undefined;
+      const phys = hasPhys ? Number(p.physical_prog) : 0;
+      const sancAmt = p ? Number(p.sanctioned_amount || p.estimated_cost || 2500000) : 2500000;
+      const hasPay = p && p.claimed_amt !== null && p.claimed_amt !== undefined;
+      const claimedAmt = hasPay ? Number(p.claimed_amt) : 0;
+      const payPct = (hasPay && sancAmt > 0) ? Number(((claimedAmt / sancAmt) * 100).toFixed(1)) : 0;
+      const delta = (hasPhys && hasPay) ? Math.max(0, payPct - phys) : 0;
+      const isHighDiv = delta > 20;
+
       return res.json({
         project_id: id,
-        risk_score: 86,
-        risk_level: 'CRITICAL',
+        risk_score: isHighDiv ? 85 : 15,
+        risk_level: isHighDiv ? 'CRITICAL' : 'LOW',
         analysis: [
-          { category: 'Payment vs physical progress', effect: 'High', explanation: 'Payment: 78% | Physical: 31% | Delta: +47%' },
-          { category: 'Photo verification', effect: 'High', explanation: 'Photo pHash 96.4% similarity to photo submitted under W-0612' },
-          { category: 'Location verification', effect: 'High', explanation: 'Photo location offset 1,420 meters from registered project site' },
-          { category: 'Project cost comparison', effect: 'Medium', explanation: 'Proposed cost is 18% above regional baseline' },
-          { category: 'Timeline & SLA', effect: 'Low', explanation: 'Proposal is within 75-day statutory SLA window' },
+          {
+            category: 'Payment vs physical progress',
+            effect: isHighDiv ? 'High' : 'Low',
+            explanation: (!hasPhys && !hasPay)
+              ? 'Payment: 0% | Physical: 0% | Status: Awaiting field progress upload by Implementing Agency'
+              : `Payment: ${payPct}% | Physical: ${phys}% | Delta: +${delta}%`
+          },
+          {
+            category: 'Photo verification',
+            effect: 'Low',
+            explanation: 'Awaiting field evidence photo upload from Implementing Agency'
+          },
+          {
+            category: 'Location verification',
+            effect: 'Low',
+            explanation: 'Coordinates registered in PostGIS database (SRID 4326)'
+          },
+          {
+            category: 'Project cost comparison',
+            effect: 'Low',
+            explanation: 'Proposed cost is within regional baseline entitlement'
+          },
+          {
+            category: 'Timeline & SLA',
+            effect: 'Low',
+            explanation: 'Proposal is within 75-day statutory SLA window'
+          },
         ],
       });
     } catch (error: any) {

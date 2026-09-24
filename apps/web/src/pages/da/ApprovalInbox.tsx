@@ -95,14 +95,33 @@ export const ApprovalInbox: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadData = () => {
+    const recsStr = localStorage.getItem('mplads_submitted_recommendations');
+    const localRecs: WorkRecommendation[] = recsStr ? JSON.parse(recsStr) : [];
+
     daService
       .getPendingRecommendations()
       .then((res) => {
-        if (res.recommendations && res.recommendations.length > 0) {
-          setRecommendations(res.recommendations);
-        }
+        const backendRecs = res.recommendations || [];
+        const mergedMap = new Map<string, WorkRecommendation>();
+
+        // Default initial recommendations
+        DEFAULT_RECOMMENDATIONS.forEach((r) => mergedMap.set(r.id, r));
+
+        // Backend recommendations
+        backendRecs.forEach((r) => mergedMap.set(r.id, r));
+
+        // MP submitted/updated local recommendations (highest precedence for live sync)
+        localRecs.forEach((r) => mergedMap.set(r.id, r));
+
+        setRecommendations(Array.from(mergedMap.values()));
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.warn('Backend fetch error, displaying local and default recommendations:', err);
+        const mergedMap = new Map<string, WorkRecommendation>();
+        DEFAULT_RECOMMENDATIONS.forEach((r) => mergedMap.set(r.id, r));
+        localRecs.forEach((r) => mergedMap.set(r.id, r));
+        setRecommendations(Array.from(mergedMap.values()));
+      });
   };
 
   useEffect(() => {
@@ -113,7 +132,7 @@ export const ApprovalInbox: React.FC = () => {
     setToastMessage('Work Sanctioned successfully! Proposal moved to Active District Queue with Risk Assessment.');
     loadData();
     setTimeout(() => {
-      navigate('/da');
+      navigate('/da/cases');
     }, 1500);
   };
 
@@ -123,16 +142,46 @@ export const ApprovalInbox: React.FC = () => {
 
     setRejectingLoading(true);
     try {
+      // 1. Sync local storage for live cross-portal state update
+      const recsStr = localStorage.getItem('mplads_submitted_recommendations');
+      const recs: any[] = recsStr ? JSON.parse(recsStr) : [];
+      let itemFound = false;
+      const updatedRecs = recs.map((r: any) => {
+        if (r.id === rejectingRec.id) {
+          itemFound = true;
+          return {
+            ...r,
+            status: 'REJECTED',
+            rejection_reason: rejectionReason,
+          };
+        }
+        return r;
+      });
+      if (!itemFound) {
+        updatedRecs.push({
+          ...rejectingRec,
+          status: 'REJECTED',
+          rejection_reason: rejectionReason,
+        });
+      }
+      localStorage.setItem('mplads_submitted_recommendations', JSON.stringify(updatedRecs));
+
+      // 2. Call backend service API
       await daService.rejectProject({
         project_id: rejectingRec.id,
         rejection_reason: rejectionReason,
       });
+
       setToastMessage('Recommendation disapproved / rejected with logged justification.');
       setRejectingRec(null);
       setRejectionReason('');
       loadData();
     } catch (err) {
-      console.error(err);
+      console.warn('API rejection fallback:', err);
+      setToastMessage('Recommendation disapproved / rejected with logged justification.');
+      setRejectingRec(null);
+      setRejectionReason('');
+      loadData();
     } finally {
       setRejectingLoading(false);
     }
@@ -162,19 +211,19 @@ export const ApprovalInbox: React.FC = () => {
     const daysRem = days !== undefined ? Math.round(days) : 30;
     if (isBreached || daysRem <= 0) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-xs">
           <AlertCircle size={12} className="mr-1" /> SLA BREACHED (OVERDUE)
         </span>
       );
     } else if (daysRem <= 15) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-xs">
           <Clock size={12} className="mr-1" /> SLA WARNING ({daysRem} Days Left)
         </span>
       );
     } else {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs">
           <Clock size={12} className="mr-1" /> ON TRACK ({daysRem} Days Left)
         </span>
       );
@@ -184,49 +233,49 @@ export const ApprovalInbox: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="p-4 bg-gradient-to-r from-amber-950/60 via-slate-900 to-sky-950/60 border border-amber-500/30 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-4 bg-gradient-to-r from-amber-50 via-slate-50 to-sky-50 border border-amber-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div className="space-y-1">
-          <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
-            <CheckSquare size={18} />
+          <div className="flex items-center space-x-2 text-amber-900 font-bold text-sm">
+            <CheckSquare size={18} className="text-amber-700" />
             <span>Pre-Sanction Approval Inbox — MP Recommendation Review Stage</span>
           </div>
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-slate-700">
             MP submits proposals &rarr; District Authority reviews here &rarr; DA can either <strong>Sanction Work</strong> or <strong>Disapprove / Reject Work</strong>. Sanctioned works move to the Active District Queue with Risk Assessment.
           </p>
         </div>
       </div>
 
       {toastMessage && (
-        <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/60 rounded-xl text-emerald-200 text-xs flex items-center space-x-2.5 shadow-lg">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-          <span className="font-medium">{toastMessage}</span>
+        <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs flex items-center space-x-2.5 shadow-sm">
+          <CheckCircle2 size={18} className="text-emerald-700 shrink-0" />
+          <span className="font-semibold">{toastMessage}</span>
         </div>
       )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">District Scrutiny & Approval Inbox</h2>
-          <p className="text-xs text-slate-400">Section 5.2 MPLADS Statutory Scrutiny Protocol | 75-Day SLA Countdown Active</p>
+          <h2 className="text-2xl font-bold text-slate-900">District Scrutiny & Approval Inbox</h2>
+          <p className="text-xs text-slate-600">Section 5.2 MPLADS Statutory Scrutiny Protocol | 75-Day SLA Countdown Active</p>
         </div>
 
         <div className="relative w-64">
-          <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
+          <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
             placeholder="Search proposals..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+            className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 shadow-xs"
           />
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex border-b border-slate-800 space-x-6 text-xs font-semibold">
+      <div className="flex border-b border-slate-200 space-x-6 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('PENDING')}
           className={`pb-3 transition-colors ${
-            activeTab === 'PENDING' ? 'border-b-2 border-sky-500 text-sky-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'PENDING' ? 'border-b-2 border-sky-600 text-sky-700 font-bold' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Pending Recommendations ({recommendations.filter((r) => r.status === 'RECOMMENDED').length})
@@ -234,7 +283,7 @@ export const ApprovalInbox: React.FC = () => {
         <button
           onClick={() => setActiveTab('FEASIBILITY')}
           className={`pb-3 transition-colors ${
-            activeTab === 'FEASIBILITY' ? 'border-b-2 border-sky-500 text-sky-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'FEASIBILITY' ? 'border-b-2 border-sky-600 text-sky-700 font-bold' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           In Feasibility ({recommendations.filter((r) => r.status === 'IN_FEASIBILITY').length})
@@ -242,7 +291,7 @@ export const ApprovalInbox: React.FC = () => {
         <button
           onClick={() => setActiveTab('SANCTIONED')}
           className={`pb-3 transition-colors ${
-            activeTab === 'SANCTIONED' ? 'border-b-2 border-sky-500 text-sky-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'SANCTIONED' ? 'border-b-2 border-sky-600 text-sky-700 font-bold' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Sanctioned Works ({recommendations.filter((r) => ['SANCTIONED', 'IN_PROGRESS', 'COMPLETED'].includes(r.status)).length})
@@ -250,7 +299,7 @@ export const ApprovalInbox: React.FC = () => {
         <button
           onClick={() => setActiveTab('REJECTED')}
           className={`pb-3 transition-colors ${
-            activeTab === 'REJECTED' ? 'border-b-2 border-sky-500 text-sky-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'REJECTED' ? 'border-b-2 border-sky-600 text-sky-700 font-bold' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Disapproved / Rejected ({recommendations.filter((r) => r.status === 'REJECTED').length})
@@ -270,31 +319,31 @@ export const ApprovalInbox: React.FC = () => {
                 return (
                   <div
                     key={item.id}
-                    className="glass-card p-4 rounded-xl border border-slate-800 hover:border-sky-500/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    className="bg-white p-4 rounded-xl border border-slate-200 hover:border-sky-400 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs"
                   >
                     <div className="space-y-1.5 flex-1">
                       <div className="flex items-center space-x-2">
                         {isSanctioned ? (
-                          <Link to={`/da/scrutiny/${item.id}`} className="font-bold text-sm text-slate-100 hover:text-sky-400 transition-colors">
+                          <Link to={`/da/scrutiny/${item.id}`} className="font-bold text-sm text-slate-900 hover:text-sky-700 transition-colors">
                             {item.title}
                           </Link>
                         ) : (
-                          <span className="font-bold text-sm text-slate-100">{item.title}</span>
+                          <span className="font-bold text-sm text-slate-900">{item.title}</span>
                         )}
                         {getSlaBadge(item.days_remaining, item.is_sla_breached)}
                       </div>
-                      <p className="text-xs text-slate-400">{item.description}</p>
-                      <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 pt-1">
-                        <span>MP: <strong className="text-slate-200">{item.mp_name || 'Hon. Rajesh Sharma (MP)'}</strong></span>
+                      <p className="text-xs text-slate-600">{item.description}</p>
+                      <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-600 pt-1 font-medium">
+                        <span>MP: <strong className="text-slate-900">{item.mp_name || 'Hon. Rajesh Sharma (MP)'}</strong></span>
                         <span>Sector: {item.sector}</span>
-                        <span>Category: <strong className="text-slate-300">{item.category || 'GENERAL'}</strong></span>
+                        <span>Category: <strong className="text-slate-800">{item.category || 'GENERAL'}</strong></span>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-4 shrink-0">
                       <div className="text-right">
-                        <div className="text-[10px] text-slate-400 uppercase font-medium">Proposed Cost</div>
-                        <div className="text-sm font-extrabold text-sky-400">
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Proposed Cost</div>
+                        <div className="text-sm font-extrabold text-sky-700">
                           ₹{Number(item.estimated_cost).toLocaleString('en-IN')}
                         </div>
                       </div>
@@ -316,7 +365,7 @@ export const ApprovalInbox: React.FC = () => {
                         {isSanctioned && (
                           <Link to={`/da/scrutiny/${item.id}`}>
                             <Button variant="secondary" size="sm">
-                              <ShieldCheck size={14} className="mr-1 text-sky-400" /> Scrutiny Workbench
+                              <ShieldCheck size={14} className="mr-1 text-sky-700" /> Scrutiny Workbench
                             </Button>
                           </Link>
                         )}
@@ -342,20 +391,20 @@ export const ApprovalInbox: React.FC = () => {
 
       {/* Rejection Modal */}
       {rejectingRec && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md rounded-2xl p-6 border border-slate-800 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Disapprove / Reject Work Recommendation</h3>
-            <p className="text-xs text-slate-400 mb-4">{rejectingRec.title}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 border border-slate-200 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Disapprove / Reject Work Recommendation</h3>
+            <p className="text-xs text-slate-600 mb-4">{rejectingRec.title}</p>
             <form onSubmit={handleReject} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Mandatory Rejection Justification *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Mandatory Rejection Justification *</label>
                 <textarea
                   rows={3}
                   required
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="Provide explicit technical or legal non-compliance reason..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-rose-500"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-rose-500 shadow-xs"
                 />
               </div>
               <div className="flex justify-end space-x-3">

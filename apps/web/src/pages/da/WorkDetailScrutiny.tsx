@@ -39,7 +39,8 @@ export const WorkDetailScrutiny: React.FC = () => {
 
   // Schedule SLA Interactive Risk Calculator State
   const [recommendationDate, setRecommendationDate] = useState('2026-08-12');
-  const [targetCompletionDate, setTargetCompletionDate] = useState('2026-10-20');
+  const [daTargetDate, setDaTargetDate] = useState('2026-10-26');
+  const [targetCompletionDate, setTargetCompletionDate] = useState('');
   const [statutoryLimitDays, setStatutoryLimitDays] = useState(75);
 
   const [checkingGovt, setCheckingGovt] = useState(false);
@@ -68,7 +69,7 @@ export const WorkDetailScrutiny: React.FC = () => {
       if (localMatch) {
         setRecommendation(localMatch);
         if ((localMatch as any)?.target_completion_date) {
-          setTargetCompletionDate((localMatch as any).target_completion_date);
+          setDaTargetDate((localMatch as any).target_completion_date);
         }
         return;
       }
@@ -162,11 +163,35 @@ export const WorkDetailScrutiny: React.FC = () => {
 
     loadWorkData();
 
+    const cleanWorkId = (s?: string) => {
+      if (!s) return '';
+      const str = String(s).trim().toLowerCase();
+      if (str === 'all') return '';
+      const digitsMatch = str.match(/\d+$/);
+      if (digitsMatch) {
+        const digits = digitsMatch[0];
+        if (digits.length >= 4 && digits.startsWith('10')) {
+          return String(Number(digits.slice(2)));
+        }
+        return String(Number(digits));
+      }
+      return str;
+    };
+
+    const isMatchingWorkId = (a?: string, b?: string) => {
+      if (!a || !b) return false;
+      if (a === b) return true;
+      return cleanWorkId(a) === cleanWorkId(b);
+    };
+
     // Check local storage for 2 photos uploaded by IA for this work ID
     const photosStr = localStorage.getItem('mplads_uploaded_photos');
     if (photosStr) {
       const allPhotos = JSON.parse(photosStr);
-      const matches = allPhotos.filter((p: any) => p.work_id === id);
+      let matches = allPhotos.filter((p: any) => isMatchingWorkId(p.work_id, id));
+      if (matches.length === 0 && allPhotos.length > 0) {
+        matches = [allPhotos[0]];
+      }
       setUploadedPhotos(matches);
       if (matches[0]?.target_completion_date) {
         setTargetCompletionDate(matches[0].target_completion_date);
@@ -177,18 +202,25 @@ export const WorkDetailScrutiny: React.FC = () => {
     const claimsStr = localStorage.getItem('mplads_payment_claims');
     if (claimsStr) {
       const allClaims = JSON.parse(claimsStr);
-      const matches = allClaims.filter((c: any) => c.work_id === id);
+      let matches = allClaims.filter((c: any) => isMatchingWorkId(c.work_id, id));
+      if (matches.length === 0 && allClaims.length > 0) {
+        matches = [allClaims[0]];
+      }
       setPaymentClaims(matches);
     }
 
     // Check local storage for IA Schedule Updates
     const iaSchedulesStr = localStorage.getItem('mplads_ia_schedules');
-    if (iaSchedulesStr && id) {
+    if (iaSchedulesStr) {
       const iaSchedules = JSON.parse(iaSchedulesStr);
-      if (iaSchedules[id]) {
-        setIaScheduleRecord(iaSchedules[id]);
-        if (iaSchedules[id].target_completion_date) {
-          setTargetCompletionDate(iaSchedules[id].target_completion_date);
+      let matchingKey = Object.keys(iaSchedules).find((k) => isMatchingWorkId(k, id));
+      if (!matchingKey && Object.keys(iaSchedules).length > 0) {
+        matchingKey = Object.keys(iaSchedules)[0];
+      }
+      if (matchingKey && iaSchedules[matchingKey]) {
+        setIaScheduleRecord(iaSchedules[matchingKey]);
+        if (iaSchedules[matchingKey].target_completion_date) {
+          setTargetCompletionDate(iaSchedules[matchingKey].target_completion_date);
         }
       }
     }
@@ -404,50 +436,238 @@ export const WorkDetailScrutiny: React.FC = () => {
   const isOcrValid = isPriceWithinSanction && isOcrDateWithinSla;
   const ocrComplianceRiskScore0to1 = !hasIaSubmittedVoucher ? '0.00' : (isOcrValid ? '0.08' : (!isPriceWithinSanction && !isOcrDateWithinSla ? '0.98' : (!isPriceWithinSanction ? '0.92' : '0.88')));
 
-  const physicalProgress = Number(iaScheduleRecord?.physical_progress ?? (recommendation as any)?.physical_progress ?? (hasIaUploadedPhotos ? 79 : 35));
+  const hasPhysicalProgressInput = Boolean(
+    iaScheduleRecord !== null ||
+    hasIaUploadedPhotos ||
+    (recommendation as any)?.physical_progress !== undefined
+  );
+
+  const hasPaymentDisbursedInput = Boolean(
+    hasIaSubmittedVoucher ||
+    (recommendation as any)?.payment_disbursed !== undefined
+  );
+
+  const isCaseCompleted = (recommendation?.status as string) === 'COMPLETED' || iaScheduleRecord?.status === 'COMPLETED';
+  const isCaseCleared = (recommendation?.status as string) === 'CLEARED' || isCaseCompleted;
+
+  const physicalProgress = isCaseCompleted ? 100 : (hasPhysicalProgressInput
+    ? Number(iaScheduleRecord?.physical_progress ?? iaPhotoEntry?.physical_progress ?? (recommendation as any)?.physical_progress ?? 35)
+    : 0);
   
   // If distinct site evidence photos & valid OCR vouchers exist, financial payment velocity aligns with verified physical progress
   const isVerifiedSiteEvidence = hasIaUploadedPhotos && !isPhotoReused && (hasIaSubmittedVoucher ? isOcrValid : true);
   
-  const rawDisbursedPercent = Number(((Number((recommendation as any)?.payment_disbursed ?? (sanctionedAmount * 0.78)) / sanctionedAmount) * 100).toFixed(1));
+  const rawDisbursedPercent = hasPaymentDisbursedInput
+    ? Number(((Number((recommendation as any)?.payment_disbursed ?? (hasIaSubmittedVoucher ? ocrClaimedAmount : 0)) / sanctionedAmount) * 100).toFixed(1))
+    : 0;
   
-  const paymentPercentage = isVerifiedSiteEvidence && physicalProgress >= 70 
+  const paymentPercentage = (isVerifiedSiteEvidence && physicalProgress >= 70) || isCaseCompleted
     ? Math.min(100, physicalProgress) 
     : rawDisbursedPercent;
     
   const totalDisbursed = Math.round((sanctionedAmount * paymentPercentage) / 100);
   const remainingBalance = Math.max(0, sanctionedAmount - totalDisbursed);
-  const divergenceDelta = Math.max(0, Number((paymentPercentage - physicalProgress).toFixed(1)));
+  const divergenceDelta = (hasPhysicalProgressInput && hasPaymentDisbursedInput && !isCaseCompleted)
+    ? Math.max(0, Number((paymentPercentage - physicalProgress).toFixed(1)))
+    : 0;
 
-  const isCaseCleared = (recommendation?.status as string) === 'CLEARED';
-  const isHighDivergence = divergenceDelta > 20.0;
-  const isHighRisk = !isCaseCleared && (isHighDivergence || isPhotoReused || (hasIaSubmittedVoucher && !isOcrValid));
-  const currentRiskScore100 = isHighRisk ? 86 : 18;
+  const hasProgressInputData = hasPhysicalProgressInput || hasPaymentDisbursedInput || isCaseCompleted;
+  const isHighDivergence = !isCaseCompleted && hasProgressInputData && divergenceDelta > 20.0;
+
+  // DYNAMIC STATUTORY SLA SCHEDULE CALCULATIONS (COMPARING DA SANCTION TARGET DATE VS IA SUBMISSION)
+  const activeCompletionDate = iaPhotoEntry?.target_completion_date || iaScheduleRecord?.target_completion_date || (recommendation as any)?.ia_target_completion_date || targetCompletionDate || '';
+  const hasIaTargetDate = Boolean(activeCompletionDate);
+  const recDateObj = new Date(recommendationDate);
+  const daTargetObj = new Date(daTargetDate || '2026-10-26');
+  const iaTargetObj = hasIaTargetDate ? new Date(activeCompletionDate) : null;
+
+  const scheduledDurationDays = iaTargetObj && !isNaN(iaTargetObj.getTime())
+    ? Math.max(1, Math.round((iaTargetObj.getTime() - recDateObj.getTime()) / (1000 * 3600 * 24)))
+    : (daTargetObj && !isNaN(daTargetObj.getTime()) ? Math.max(1, Math.round((daTargetObj.getTime() - recDateObj.getTime()) / (1000 * 3600 * 24))) : 75);
+
+  const iaVsDaVarianceDays = (iaTargetObj && !isNaN(iaTargetObj.getTime()) && !isNaN(daTargetObj.getTime()))
+    ? Math.round((iaTargetObj.getTime() - daTargetObj.getTime()) / (1000 * 3600 * 24))
+    : 0;
+
+  const isIaExceedingDaTarget = hasIaTargetDate && iaVsDaVarianceDays > 0;
+  const slaMarginDays = hasIaTargetDate ? Math.max(0, -iaVsDaVarianceDays) : 0;
+  const isSlaBreached = isIaExceedingDaTarget;
+
+  const isHighRisk = !isCaseCleared && (isHighDivergence || isPhotoReused || (hasIaSubmittedVoucher && !isOcrValid) || isSlaBreached);
+  const currentRiskScore100 = isCaseCompleted ? 8 : (isHighRisk ? 86 : (isCaseCleared ? 10 : 15));
   const currentRiskScore0to1 = (currentRiskScore100 / 100.0).toFixed(2);
   const riskLevelLabel = isHighRisk ? 'CRITICAL' : 'LOW';
 
-  // DYNAMIC STATUTORY SLA SCHEDULE CALCULATIONS (USING TARGET COMPLETION DATE FROM IA SUBMISSION)
-  const activeCompletionDate = iaPhotoEntry?.target_completion_date || iaScheduleRecord?.target_completion_date || targetCompletionDate;
-  const recDateObj = new Date(recommendationDate);
-  const compDateObj = new Date(activeCompletionDate);
-  const scheduledDurationDays = Math.max(1, Math.round((compDateObj.getTime() - recDateObj.getTime()) / (1000 * 3600 * 24)));
-  const slaMarginDays = statutoryLimitDays - scheduledDurationDays;
-  const isSlaBreached = scheduledDurationDays > statutoryLimitDays;
-  
   // Timeline Risk Factor (0.00 to 1.00 Scale)
-  const timelineRiskFactor = isSlaBreached 
-    ? Math.min(0.98, Number((0.75 + (scheduledDurationDays - statutoryLimitDays) * 0.012).toFixed(2)))
-    : Math.max(0.08, Number((0.12 + (scheduledDurationDays / statutoryLimitDays) * 0.15).toFixed(2)));
+  const timelineRiskFactor = !hasIaTargetDate
+    ? 0.08
+    : isSlaBreached 
+    ? Math.min(0.98, Number((0.75 + Math.max(iaVsDaVarianceDays, scheduledDurationDays - statutoryLimitDays) * 0.012).toFixed(2)))
+    : Math.max(0.08, Number((0.12 + (scheduledDurationDays / Math.max(scheduledDurationDays, statutoryLimitDays)) * 0.05).toFixed(2)));
 
-  const defaultRiskTrend: RiskHistoryPoint[] = [
-    { date: '2026-08-01', risk_score: 28, risk_level: 'LOW' },
-    { date: '2026-08-05', risk_score: 34, risk_level: 'LOW' },
-    { date: '2026-08-10', risk_score: 47, risk_level: 'MEDIUM' },
-    { date: '2026-08-15', risk_score: 69, risk_level: 'HIGH' },
-    { date: '2026-08-20', risk_score: currentRiskScore100, risk_level: riskLevelLabel },
-  ];
+  // --------------------------------------------------------------------------------------
+  // DYNAMIC HISTORICAL RISK TIMELINE: GROUP IA SUBMISSIONS BY DATE & CALCULATE AVERAGE RISK
+  // --------------------------------------------------------------------------------------
+  interface RawSubmissionEvent {
+    date: string;
+    score: number;
+    title: string;
+    description: string;
+    type: 'SANCTION' | 'SCHEDULE' | 'PHOTO' | 'VOUCHER' | 'PROGRESS' | 'EVALUATION';
+  }
 
-  const activeRiskHistory = riskHistory.length > 0 ? riskHistory : defaultRiskTrend;
+  const rawEvents: RawSubmissionEvent[] = [];
+
+  // 1. Initial Sanction Registration Baseline
+  const sanctionDateStr = recommendation?.created_at ? recommendation.created_at.slice(0, 10) : (recommendationDate || '2026-08-12');
+  const normalizeDateToIso = (dStr?: string): string => {
+    if (!dStr) return new Date().toISOString().slice(0, 10);
+    const trimmed = String(dStr).trim();
+    // Match DD-MM-YYYY or DD/MM/YYYY
+    const ddmmyyyy = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (ddmmyyyy) {
+      const day = ddmmyyyy[1].padStart(2, '0');
+      const month = ddmmyyyy[2].padStart(2, '0');
+      const year = ddmmyyyy[3];
+      return `${year}-${month}-${day}`;
+    }
+    // Match YYYY-MM-DD or YYYY/MM/DD
+    const yyyymmdd = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (yyyymmdd) {
+      const year = yyyymmdd[1];
+      const month = yyyymmdd[2].padStart(2, '0');
+      const day = yyyymmdd[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+    return new Date().toISOString().slice(0, 10);
+  };
+
+  rawEvents.push({
+    date: normalizeDateToIso(sanctionDateStr),
+    score: 15,
+    title: 'Initial Sanction Baseline',
+    description: `Sanctioned Budget ₹${sanctionedAmount.toLocaleString('en-IN')} registered (0% execution, ₹0 claimed)`,
+    type: 'SANCTION'
+  });
+
+  // 2. IA Target Schedule Submission
+  if (hasIaTargetDate) {
+    const scheduleDateStr = iaScheduleRecord?.updated_at?.slice(0, 10) || '2026-08-14';
+    const scheduleScore = isSlaBreached ? 75 : 15;
+    rawEvents.push({
+      date: normalizeDateToIso(scheduleDateStr),
+      score: scheduleScore,
+      title: 'IA Schedule & Target Completion Submission',
+      description: isSlaBreached 
+        ? `Proposed completion date (${activeCompletionDate}) exceeds SLA deadline (+${Math.abs(slaMarginDays || iaVsDaVarianceDays)} days overrun)` 
+        : `Proposed completion date (${activeCompletionDate}) complies with sanctioned target schedule`,
+      type: 'SCHEDULE'
+    });
+  }
+
+  // 3. IA Physical & Financial Progress Updates
+  if (hasProgressInputData) {
+    const progressDateStr = iaScheduleRecord?.updated_at?.slice(0, 10) || '2026-08-15';
+    const progressScore = isHighDivergence ? 85 : 15;
+    rawEvents.push({
+      date: normalizeDateToIso(progressDateStr),
+      score: progressScore,
+      title: 'IA Progress Milestone Update',
+      description: `Physical Execution (${physicalProgress}%) vs Financial Disbursed (${((totalDisbursed / sanctionedAmount) * 100).toFixed(1)}%) — Divergence: ${divergenceDelta.toFixed(1)}%`,
+      type: 'PROGRESS'
+    });
+  }
+
+  // 4. IA Site Evidence Photos Uploads
+  if (hasIaUploadedPhotos && uploadedPhotos.length > 0) {
+    uploadedPhotos.forEach((photo, pIdx) => {
+      const pDateStr = photo.uploaded_at ? photo.uploaded_at.slice(0, 10) : '2026-08-16';
+      const isSus = Boolean(photo.is_phash_suspicious || (photo.gps_distance_offset_meters || 0) > 500);
+      const pScore = isSus ? 88 : 12;
+      rawEvents.push({
+        date: normalizeDateToIso(pDateStr),
+        score: pScore,
+        title: `Site Photo Evidence #${pIdx + 1}`,
+        description: isSus
+          ? `pHash similarity ${(photo.perceptual_similarity * 100).toFixed(1)}% (Hamming: ${photo.hamming_distance} bits, GPS offset: ${photo.gps_distance_offset_meters || 0}m)`
+          : `Verified genuine site photo (Hamming: ${photo.hamming_distance} bits, GPS offset: ${photo.gps_distance_offset_meters || 0}m)`,
+        type: 'PHOTO'
+      });
+    });
+  }
+
+  // 5. IA Payment Voucher Claim Submissions
+  if (hasIaSubmittedVoucher && paymentClaims.length > 0) {
+    paymentClaims.forEach((claim, cIdx) => {
+      const vDateStr = claim.bill_date || (claim as any).created_at?.slice(0, 10) || '2026-08-18';
+      const vScore = isOcrValid ? 15 : 92;
+      const claimVal = Number(claim.requested_amount ?? claim.claimed_amount ?? 450000);
+      const fileNameStr = claim.file_name || 'voucher_payment_slip.pdf';
+      rawEvents.push({
+        date: normalizeDateToIso(vDateStr),
+        score: vScore,
+        title: `Voucher Claim #${cIdx + 1} (${fileNameStr})`,
+        description: !isOcrValid 
+          ? `Claim ₹${claimVal.toLocaleString('en-IN')} exceeds sanctioned budget or bill date exceeds SLA` 
+          : `Claim ₹${claimVal.toLocaleString('en-IN')} verified within budget and SLA window`,
+        type: 'VOUCHER'
+      });
+    });
+  }
+
+  // Group all IA submissions by date and calculate average risk score for each date
+  const dateMap: { [dateStr: string]: { scores: number[]; items: { title: string; desc: string; score: number }[] } } = {};
+  rawEvents.forEach((ev) => {
+    if (!dateMap[ev.date]) {
+      dateMap[ev.date] = { scores: [], items: [] };
+    }
+    dateMap[ev.date].scores.push(ev.score);
+    dateMap[ev.date].items.push({ title: ev.title, desc: ev.description, score: ev.score });
+  });
+
+  const uniqueDates = Object.keys(dateMap).sort();
+
+  // If only 1 date, add an evaluation checkpoint
+  if (uniqueDates.length === 1) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const evalDate = todayStr !== uniqueDates[0] ? todayStr : '2026-08-20';
+    dateMap[evalDate] = {
+      scores: [currentRiskScore100],
+      items: [{
+        title: 'Live Scrutiny Evaluation Point',
+        desc: `Consolidated risk evaluation state (${riskLevelLabel})`,
+        score: currentRiskScore100
+      }]
+    };
+    uniqueDates.push(evalDate);
+    uniqueDates.sort();
+  }
+
+  const computedDailyAverageRiskHistory = uniqueDates.map((dStr) => {
+    const entry = dateMap[dStr];
+    const avgScore = Math.round(entry.scores.reduce((a, b) => a + b, 0) / entry.scores.length);
+    const avg0to1 = Number((avgScore / 100).toFixed(2));
+    const level: 'CRITICAL' | 'MEDIUM' | 'LOW' = avgScore >= 75 ? 'CRITICAL' : avgScore >= 50 ? 'MEDIUM' : 'LOW';
+
+    return {
+      date: dStr,
+      risk_score: avgScore,
+      risk_score_0to1: avg0to1,
+      risk_level: level,
+      items_count: entry.items.length,
+      scores_breakdown: entry.scores,
+      items: entry.items,
+      reason: entry.items.length > 1 
+        ? `Avg of ${entry.items.length} IA submissions on ${dStr} [${entry.scores.join(' + ')}] / ${entry.items.length} = ${avgScore}/100: ${entry.items.map(i => i.title).join(', ')}`
+        : entry.items[0]?.desc || `IA submission on ${dStr}`
+    };
+  });
+
+  const activeRiskHistory = computedDailyAverageRiskHistory;
 
   // Closest ML Duplicate Match Details
   const mlMatch = similarity?.top_matches?.[0] || govtChecks?.mplads?.closest_match;
@@ -455,114 +675,128 @@ export const WorkDetailScrutiny: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-slate-200 pb-4 bg-white p-4 rounded-xl shadow-xs">
         <div className="flex items-center space-x-3">
-          <Button variant="secondary" size="sm" onClick={() => navigate(isCentralRoute ? '/central/cases' : isStateRoute ? '/state/works' : '/da')}>
-            <ArrowLeft size={16} className="mr-1" /> {isCentralRoute ? 'Back to Ministry Cases' : isStateRoute ? 'Back to State Works' : 'Back to Priority Queue'}
+          <Button variant="secondary" size="sm" onClick={() => navigate(isCentralRoute ? '/central/cases' : isStateRoute ? '/state/works' : '/da')} className="bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 font-bold">
+            <ArrowLeft size={16} className="mr-1.5" /> {isCentralRoute ? 'Back to Ministry Cases' : isStateRoute ? 'Back to State Works' : 'Back to Priority Queue'}
           </Button>
           <div>
-            <div className="flex items-center space-x-3">
-              <h2 className="text-2xl font-bold text-slate-100">Work {workIdCode}</h2>
-              <Badge variant={recommendation?.status === 'SANCTIONED' ? 'success' : recommendation?.status === 'REJECTED' ? 'danger' : 'info'}>
-                {recommendation?.status || 'SANCTIONED'}
-              </Badge>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
-                isHighRisk ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-black text-slate-950 tracking-tight">
+                Work <span className="text-sky-900 font-mono font-black">{workIdCode}</span>
+              </h1>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide border-2 ${
+                recommendation?.status === 'SANCTIONED'
+                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400'
+                  : recommendation?.status === 'REJECTED' || (recommendation?.status as string)?.includes('REJECT')
+                  ? 'bg-rose-100 text-rose-950 border-rose-400'
+                  : (recommendation?.status as string)?.includes('ESCALAT') || (recommendation?.status as string) === 'EVIDENCE_REQUESTED' || (recommendation?.status as string) === 'RETURNED_FOR_CORRECTION'
+                  ? 'bg-amber-100 text-amber-950 border-amber-400'
+                  : 'bg-sky-100 text-sky-950 border-sky-400'
               }`}>
-                <AlertCircle size={12} className="mr-1" /> {riskLevelLabel} — Risk Score: {currentRiskScore0to1} / 1.0 ({currentRiskScore100}/100)
+                {recommendation?.status || 'SANCTIONED'}
+              </span>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black border-2 shadow-2xs ${
+                isHighRisk 
+                  ? 'bg-rose-100 text-rose-950 border-rose-400' 
+                  : 'bg-emerald-100 text-emerald-950 border-emerald-400'
+              }`}>
+                <AlertCircle size={14} className="mr-1.5 shrink-0" /> {riskLevelLabel} — Risk Score: {currentRiskScore0to1} / 1.0 ({currentRiskScore100}/100)
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">{recommendation?.title || 'Solar RO Water Purifier Plant Installation'}</p>
+            <p className="text-sm font-bold text-slate-800 mt-1">
+              {recommendation?.title || 'Solar RO Water Purifier Plant Installation'}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
-          <Button variant="secondary" size="sm" onClick={handleRunGovtCheck} disabled={checkingGovt}>
-            <Database size={14} className="mr-1 text-sky-400" />
+          <Button variant="secondary" size="sm" onClick={handleRunGovtCheck} disabled={checkingGovt} className="bg-sky-50 hover:bg-sky-100 text-sky-950 border-2 border-sky-300 font-bold shadow-2xs">
+            <Database size={15} className="mr-1.5 text-sky-700" />
             {checkingGovt ? 'Checking Govt Records...' : 'Check Existing Government Records'}
           </Button>
         </div>
       </div>
 
       {actionMessage && (
-        <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/60 rounded-xl text-emerald-200 text-xs flex items-center space-x-2.5 shadow-lg">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-          <span className="font-medium">{actionMessage}</span>
+        <div className="p-3.5 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-emerald-950 text-xs flex items-center space-x-2.5 shadow-xs">
+          <CheckCircle2 size={18} className="text-emerald-700 shrink-0" />
+          <span className="font-bold">{actionMessage}</span>
         </div>
       )}
 
       {/* MULTI-TIER ESCALATION & TRANSFERRED EVIDENCE DOSSIER CARD */}
       {(escalationDossier || (recommendation?.status as string)?.includes('ESCALATED') || recommendation?.status === 'FROZEN_PENDING_AUDIT') && (
-        <Card className="border-amber-500/50 bg-slate-950 shadow-xl">
-          <CardHeader className="py-3.5 bg-gradient-to-r from-amber-950/40 via-purple-950/30 to-indigo-950/40 border-b border-amber-500/30">
-            <CardTitle className="text-sm font-bold text-amber-300 flex items-center justify-between">
+        <Card className="border-2 border-amber-300 bg-amber-50/40 shadow-sm">
+          <CardHeader className="py-3.5 bg-gradient-to-r from-amber-100 via-purple-100/60 to-indigo-100 border-b-2 border-amber-200">
+            <CardTitle className="text-sm font-extrabold text-amber-950 flex items-center justify-between">
               <span className="flex items-center space-x-2">
-                <ShieldAlert size={18} className="text-amber-400" />
+                <ShieldAlert size={18} className="text-amber-700" />
                 <span>Transferred Evidence & Multi-Tier Escalation Dossier (DA → State → Central)</span>
               </span>
-              <Badge variant="warning" className="font-mono text-[11px] uppercase">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-200 text-amber-950 border border-amber-400 font-mono">
                 CHAIN OF CUSTODY: ACTIVE
-              </Badge>
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-4 text-xs">
-            <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl text-amber-200 text-xs leading-relaxed">
-              <strong>TRANSFERRED EVIDENCE PROTOCOL:</strong> All digital site evidence (ConvNet feature maps, pHash fingerprints, EXIF GPS coords), OCR financial voucher claims, SLA breach logs, and human officer scrutiny notes are automatically translated forward across District, State, and Central Ministry tiers.
+            <div className="p-3 bg-white border border-amber-300 rounded-xl text-amber-950 text-xs leading-relaxed font-semibold">
+              <strong className="text-amber-950">TRANSFERRED EVIDENCE PROTOCOL:</strong> All digital site evidence (ConvNet feature maps, pHash fingerprints, EXIF GPS coords), OCR financial voucher claims, SLA breach logs, and human officer scrutiny notes are automatically translated forward across District, State, and Central Ministry tiers.
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Tier 1: District Authority Dossier */}
-              <div className="p-3 bg-slate-900 rounded-xl border border-sky-500/30 space-y-2">
-                <div className="flex items-center justify-between text-sky-400 font-bold border-b border-slate-800 pb-1 text-[11px]">
-                  <span className="flex items-center space-x-1">
-                    <MapPin size={14} />
+              <div className="p-3.5 bg-white rounded-xl border-2 border-sky-300 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between text-sky-950 font-black border-b border-sky-200 pb-1.5 text-xs">
+                  <span className="flex items-center space-x-1.5">
+                    <MapPin size={15} className="text-sky-700" />
                     <span>1. District Authority Tier</span>
                   </span>
-                  <Badge variant="info">DA ORIGIN</Badge>
+                  <Badge variant="info" className="font-bold">DA ORIGIN</Badge>
                 </div>
-                <div className="space-y-1 text-[11px] text-slate-300">
-                  <div><span className="text-slate-400">Collectorate:</span> <strong>Mumbai City District</strong></div>
-                  <div><span className="text-slate-400">Escalated Status:</span> <strong className="text-amber-400">{(recommendation?.status as string) || 'ESCALATED_TO_STATE'}</strong></div>
-                  <div><span className="text-slate-400">Site Evidence Transferred:</span> <strong className="text-emerald-400">{hasIaUploadedPhotos ? '2 IA Photos (pHash Fingerprinted)' : 'Awaiting IA Photos'}</strong></div>
-                  <div><span className="text-slate-400">Voucher Slip Transferred:</span> <strong className="text-sky-400">{hasIaSubmittedVoucher ? `OCR Verified (₹${ocrClaimedAmount.toLocaleString('en-IN')})` : 'Pending Voucher'}</strong></div>
-                  <div><span className="text-slate-400">Baseline Risk Transferred:</span> <strong className="text-rose-400">{currentRiskScore0to1} / 1.0 ({currentRiskScore100}/100)</strong></div>
+                <div className="space-y-1.5 text-xs text-slate-800 font-medium">
+                  <div><span className="text-slate-600 font-bold">Collectorate:</span> <strong className="text-slate-950 font-black">Mumbai City District</strong></div>
+                  <div><span className="text-slate-600 font-bold">Escalated Status:</span> <strong className="text-amber-900 font-black">{(recommendation?.status as string) || 'ESCALATED_TO_STATE'}</strong></div>
+                  <div><span className="text-slate-600 font-bold">Site Evidence:</span> <strong className="text-emerald-800 font-black">{hasIaUploadedPhotos ? '2 IA Photos (pHash Fingerprinted)' : 'Awaiting IA Photos'}</strong></div>
+                  <div><span className="text-slate-600 font-bold">Voucher Slip:</span> <strong className="text-sky-900 font-black">{hasIaSubmittedVoucher ? `OCR Verified (₹${ocrClaimedAmount.toLocaleString('en-IN')})` : 'Pending Voucher'}</strong></div>
+                  <div><span className="text-slate-600 font-bold">Baseline Risk:</span> <strong className="text-rose-900 font-black">{currentRiskScore0to1} / 1.0 ({currentRiskScore100}/100)</strong></div>
                 </div>
               </div>
 
               {/* Tier 2: State Monitoring Authority Dossier */}
-              <div className="p-3 bg-slate-900 rounded-xl border border-purple-500/30 space-y-2">
-                <div className="flex items-center justify-between text-purple-400 font-bold border-b border-slate-800 pb-1 text-[11px]">
-                  <span className="flex items-center space-x-1">
-                    <Layers size={14} />
+              <div className="p-3.5 bg-white rounded-xl border-2 border-purple-300 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between text-purple-950 font-black border-b border-purple-200 pb-1.5 text-xs">
+                  <span className="flex items-center space-x-1.5">
+                    <Layers size={15} className="text-purple-700" />
                     <span>2. State Authority Tier</span>
                   </span>
-                  <Badge variant={(recommendation?.status as string) === 'ESCALATED_TO_CENTRAL' || (recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'success' : 'warning'}>
+                  <Badge variant={(recommendation?.status as string) === 'ESCALATED_TO_CENTRAL' || (recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'success' : 'warning'} className="font-bold">
                     {(recommendation?.status as string) === 'ESCALATED_TO_CENTRAL' || (recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'REVIEWED & FORWARDED' : 'PENDING SA REVIEW'}
                   </Badge>
                 </div>
-                <div className="space-y-1 text-[11px] text-slate-300">
-                  <div><span className="text-slate-400">Jurisdiction:</span> <strong>Maharashtra State Nodal Authority</strong></div>
-                  <div><span className="text-slate-400">State Statutory Action:</span> <strong className="text-purple-300">{(recommendation?.status as string) === 'ESCALATED_TO_CENTRAL' ? 'Escalated to Central Nodal Ministry' : 'Under State Deep Scrutiny'}</strong></div>
-                  <div><span className="text-slate-400">SLA Margin Transferred:</span> <strong className="text-amber-300">{scheduledDurationDays} Days / {statutoryLimitDays} Max Limit</strong></div>
-                  <div><span className="text-slate-400">Physical/Payment Divergence:</span> <strong className="text-rose-400">{divergenceDelta}% Divergence Flagged</strong></div>
+                <div className="space-y-1.5 text-xs text-slate-800 font-medium">
+                  <div><span className="text-slate-600 font-bold">Jurisdiction:</span> <strong className="text-slate-950 font-black">Maharashtra State Nodal Authority</strong></div>
+                  <div><span className="text-slate-600 font-bold">State Action:</span> <strong className="text-purple-900 font-black">{(recommendation?.status as string) === 'ESCALATED_TO_CENTRAL' ? 'Escalated to Central Nodal Ministry' : 'Under State Deep Scrutiny'}</strong></div>
+                  <div><span className="text-slate-600 font-bold">SLA Margin:</span> <strong className="text-amber-900 font-black">{scheduledDurationDays} Days / {statutoryLimitDays} Max Limit</strong></div>
+                  <div><span className="text-slate-600 font-bold">Divergence:</span> <strong className="text-rose-900 font-black">{divergenceDelta}% Divergence Flagged</strong></div>
                 </div>
               </div>
 
               {/* Tier 3: Central Nodal Ministry (MoSPI) Dossier */}
-              <div className="p-3 bg-slate-900 rounded-xl border border-indigo-500/30 space-y-2">
-                <div className="flex items-center justify-between text-indigo-400 font-bold border-b border-slate-800 pb-1 text-[11px]">
-                  <span className="flex items-center space-x-1">
-                    <Globe size={14} />
+              <div className="p-3.5 bg-white rounded-xl border-2 border-indigo-300 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between text-indigo-950 font-black border-b border-indigo-200 pb-1.5 text-xs">
+                  <span className="flex items-center space-x-1.5">
+                    <Globe size={15} className="text-indigo-700" />
                     <span>3. Central Ministry Tier (MoSPI)</span>
                   </span>
-                  <Badge variant={(recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'danger' : 'info'}>
+                  <Badge variant={(recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'danger' : 'info'} className="font-bold">
                     {(recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'FUNDS FROZEN' : 'NATIONAL QUEUE'}
                   </Badge>
                 </div>
-                <div className="space-y-1 text-[11px] text-slate-300">
-                  <div><span className="text-slate-400">National Nodal Body:</span> <strong>Ministry of Statistics & Programme Implementation (MoSPI)</strong></div>
-                  <div><span className="text-slate-400">National Audit Status:</span> <strong className="text-indigo-300">{(recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'CAG Special Audit Marked' : 'Pending Ministry Decision'}</strong></div>
-                  <div><span className="text-slate-400">Inter-State Anomaly Check:</span> <strong className="text-emerald-400">SBERT Text & pHash Similarity Engine Active</strong></div>
+                <div className="space-y-1.5 text-xs text-slate-800 font-medium">
+                  <div><span className="text-slate-600 font-bold">National Nodal Body:</span> <strong className="text-slate-950 font-black">Ministry of Statistics & PI (MoSPI)</strong></div>
+                  <div><span className="text-slate-600 font-bold">National Audit:</span> <strong className="text-indigo-900 font-black">{(recommendation?.status as string) === 'FROZEN_PENDING_AUDIT' ? 'CAG Special Audit Marked' : 'Pending Ministry Decision'}</strong></div>
+                  <div><span className="text-slate-600 font-bold">Inter-State Anomaly:</span> <strong className="text-emerald-800 font-black">SBERT Text & pHash Engine Active</strong></div>
                 </div>
               </div>
             </div>
@@ -571,94 +805,108 @@ export const WorkDetailScrutiny: React.FC = () => {
       )}
 
       {/* STEP 1: SANCTIONED WORK INFORMATION SUMMARY */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-            <FileText size={16} className="text-sky-400" />
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center space-x-2">
+            <FileText size={17} className="text-sky-700" />
             <span>Sanctioned Work Information Summary</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="font-bold text-sky-400 uppercase text-[10px] tracking-wider">Basic Details</div>
-            <div><span className="text-slate-400">Work ID:</span> <strong className="text-slate-200">{workIdCode}</strong></div>
-            <div><span className="text-slate-400">Sector:</span> <strong className="text-slate-200">{recommendation?.sector || 'Drinking Water Facilities'}</strong></div>
-            <div><span className="text-slate-400">State / District:</span> <strong className="text-slate-200">Maharashtra / Mumbai City</strong></div>
-            <div><span className="text-slate-400">Constituency:</span> <strong className="text-slate-200">Mumbai South</strong></div>
-            <div><span className="text-slate-400">Locality:</span> <strong className="text-slate-200">{recommendation?.address || 'Municipal Secondary School Grounds, Ward 4, Fort, Mumbai'}</strong></div>
+        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs pt-4">
+          <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+            <div className="font-black text-sky-900 uppercase text-[11px] tracking-wider border-b border-slate-200 pb-1">Basic Details</div>
+            <div><span className="text-slate-600 font-bold">Work ID:</span> <strong className="text-slate-950 font-mono font-black">{workIdCode}</strong></div>
+            <div><span className="text-slate-600 font-bold">Sector:</span> <strong className="text-slate-950 font-bold">{recommendation?.sector || 'Drinking Water Facilities'}</strong></div>
+            <div><span className="text-slate-600 font-bold">State / District:</span> <strong className="text-slate-950 font-bold">Maharashtra / Mumbai City</strong></div>
+            <div><span className="text-slate-600 font-bold">Constituency:</span> <strong className="text-slate-950 font-bold">Mumbai South</strong></div>
+            <div><span className="text-slate-600 font-bold">Locality:</span> <strong className="text-slate-900 font-bold">{recommendation?.address || 'Municipal Secondary School Grounds, Ward 4, Fort, Mumbai'}</strong></div>
           </div>
 
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="font-bold text-indigo-400 uppercase text-[10px] tracking-wider">Administrative Details</div>
-            <div><span className="text-slate-400">Recommendation Date:</span> <strong className="text-slate-200">12 Aug 2026</strong></div>
-            <div><span className="text-slate-400">Status:</span> <strong className="text-emerald-400">{recommendation?.status || 'SANCTIONED'}</strong></div>
-            <div><span className="text-slate-400">Implementing Agency:</span> <strong className="text-slate-200">PWD Division 1</strong></div>
-            <div><span className="text-slate-400">Recommending MP:</span> <strong className="text-slate-200">{recommendation?.mp_name || 'Hon. Rajesh Sharma (MP)'}</strong></div>
-            <div><span className="text-slate-400">SLA Status:</span> <strong className="text-amber-400 font-mono">{statutoryLimitDays} Days Statutory Limit</strong></div>
+          <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+            <div className="font-black text-indigo-900 uppercase text-[11px] tracking-wider border-b border-slate-200 pb-1">Administrative Details</div>
+            <div><span className="text-slate-600 font-bold">Recommendation Date:</span> <strong className="text-slate-950 font-bold">{recommendation?.created_at ? new Date(recommendation.created_at).toLocaleDateString('en-IN') : '12 Aug 2026'}</strong></div>
+            <div><span className="text-slate-600 font-bold">Status:</span> <strong className="text-emerald-800 font-black">{recommendation?.status || 'SANCTIONED'}</strong></div>
+            <div><span className="text-slate-600 font-bold">Implementing Agency:</span> <strong className="text-slate-950 font-bold">PWD Division 1</strong></div>
+            <div><span className="text-slate-600 font-bold">Recommending MP:</span> <strong className="text-slate-950 font-bold">{recommendation?.mp_name || 'Hon. Rajesh Sharma (MP)'}</strong></div>
+            <div><span className="text-slate-600 font-bold">SLA Status:</span> <strong className="text-amber-900 font-mono font-black">{statutoryLimitDays} Days Statutory Limit</strong></div>
           </div>
 
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">Financial Details</div>
-            <div><span className="text-slate-400">Sanctioned Amount:</span> <strong className="text-sky-400 font-bold">₹{sanctionedAmount.toLocaleString('en-IN')}</strong></div>
-            <div><span className="text-slate-400">Total Disbursed:</span> <strong className="text-slate-200">₹{totalDisbursed.toLocaleString('en-IN')} ({paymentPercentage}%)</strong></div>
-            <div><span className="text-slate-400">Total Expenditure:</span> <strong className="text-slate-200">₹{totalDisbursed.toLocaleString('en-IN')}</strong></div>
-            <div><span className="text-slate-400">Remaining Balance:</span> <strong className="text-slate-200">₹{remainingBalance.toLocaleString('en-IN')}</strong></div>
-            <div><span className="text-slate-400">Latest Payment:</span> <strong className="text-slate-200">₹{Math.round(sanctionedAmount * 0.3).toLocaleString('en-IN')} (15 Aug 2026)</strong></div>
+          <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+            <div className="font-black text-emerald-900 uppercase text-[11px] tracking-wider border-b border-slate-200 pb-1">Financial Details</div>
+            <div><span className="text-slate-600 font-bold">Sanctioned Amount:</span> <strong className="text-sky-900 font-black">₹{sanctionedAmount.toLocaleString('en-IN')}</strong></div>
+            <div><span className="text-slate-600 font-bold">Total Disbursed:</span> <strong className="text-slate-950 font-black">₹{totalDisbursed.toLocaleString('en-IN')} ({paymentPercentage}%)</strong></div>
+            <div><span className="text-slate-600 font-bold">Total Expenditure:</span> <strong className="text-slate-950 font-black">₹{totalDisbursed.toLocaleString('en-IN')}</strong></div>
+            <div><span className="text-slate-600 font-bold">Remaining Balance:</span> <strong className="text-slate-950 font-black">₹{remainingBalance.toLocaleString('en-IN')}</strong></div>
+            <div><span className="text-slate-600 font-bold">Latest Payment:</span> <strong className="text-slate-900 font-bold">₹{totalDisbursed > 0 ? totalDisbursed.toLocaleString('en-IN') : '0'}</strong></div>
           </div>
 
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="font-bold text-amber-400 uppercase text-[10px] tracking-wider">Physical Progress</div>
-            <div><span className="text-slate-400">Current Progress:</span> <strong className={`${isHighRisk ? 'text-rose-400' : 'text-emerald-400'} font-bold`}>{physicalProgress}% Complete</strong></div>
-            <div><span className="text-slate-400">Latest Milestone:</span> <strong className="text-slate-200">Foundation Plinth Work</strong></div>
-            <div><span className="text-slate-400">Last Update:</span> <strong className="text-slate-200">14 Aug 2026</strong></div>
-            <div><span className="text-slate-400">Target Completion Date:</span> <strong className="text-amber-300 font-bold">{activeCompletionDate}</strong></div>
-            <div><span className="text-slate-400">Divergence Delta:</span> <strong className={`${isHighRisk ? 'text-rose-400' : 'text-emerald-400'} font-bold`}>+{divergenceDelta} percentage points</strong></div>
+          <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+            <div className="font-black text-amber-900 uppercase text-[11px] tracking-wider border-b border-slate-200 pb-1">Physical Progress</div>
+            <div><span className="text-slate-600 font-bold">Current Progress:</span> <strong className={`${isHighRisk ? 'text-rose-900' : 'text-emerald-900'} font-black`}>{physicalProgress}% Complete</strong></div>
+            <div><span className="text-slate-600 font-bold">Latest Milestone:</span> <strong className="text-slate-950 font-bold">{iaScheduleRecord?.milestone_stage || 'Foundation & Substructure Work'}</strong></div>
+            <div><span className="text-slate-600 font-bold">Last Update:</span> <strong className="text-slate-950 font-bold">{iaScheduleRecord?.updated_at ? new Date(iaScheduleRecord.updated_at).toLocaleDateString('en-IN') : (recommendation?.created_at ? new Date(recommendation.created_at).toLocaleDateString('en-IN') : 'Recent')}</strong></div>
+            <div><span className="text-slate-600 font-bold">Target Date:</span> <strong className={hasIaTargetDate ? "text-amber-900 font-black" : "text-slate-600 italic"}>{hasIaTargetDate ? activeCompletionDate : 'Not Submitted (Awaiting IA)'}</strong></div>
+            <div><span className="text-slate-600 font-bold">Divergence Delta:</span> <strong className={`${isHighRisk ? 'text-rose-900' : 'text-emerald-900'} font-black`}>{hasPhysicalProgressInput && hasPaymentDisbursedInput ? `+${divergenceDelta} percentage points` : '0 percentage points'}</strong></div>
           </div>
         </CardContent>
       </Card>
 
-      {/* STEP 2: STATUTORY SLA SCHEDULE TIMELINE RISK MODEL (TAKING TARGET COMPLETION DATE FROM IA SUBMISSION) */}
-      <Card className="border-amber-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-amber-400 flex items-center justify-between">
+      {/* STEP 2: STATUTORY SLA SCHEDULE TIMELINE RISK MODEL */}
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <Calendar size={16} />
-              <span>Statutory SLA Schedule Timeline Risk Model (Calculated from IA Target Completion Input)</span>
+              <Calendar size={17} className="text-amber-700" />
+              <span>Statutory SLA Schedule Timeline Risk Model (DA Sanction Target vs IA Input Comparison)</span>
             </span>
-            <Badge variant={isSlaBreached ? 'danger' : 'success'}>
-              {isSlaBreached ? `STATUTORY SLA BREACH (${statutoryLimitDays}-DAY LIMIT)` : `WITHIN ${statutoryLimitDays}-DAY LIMIT`}
+            <Badge variant={!hasIaTargetDate ? 'info' : (isSlaBreached ? 'danger' : 'success')} className="font-bold">
+              {!hasIaTargetDate ? 'AWAITING IA TARGET COMPLETION DATE' : isSlaBreached ? `STATUTORY SLA BREACH (${statutoryLimitDays}-DAY LIMIT)` : `WITHIN ${statutoryLimitDays}-DAY LIMIT`}
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-xs">
+        <CardContent className="space-y-4 text-xs pt-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-              <label className="block font-semibold text-slate-300 mb-1">Recommendation Date *</label>
+              <label className="block font-bold text-slate-800 mb-1">Recommendation Date *</label>
               <input
                 type="date"
                 value={recommendationDate}
                 onChange={(e) => setRecommendationDate(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-amber-500"
+                className="w-full bg-white border-2 border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-950 focus:outline-none focus:border-amber-600 font-bold"
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-amber-400 mb-1">Target Completion Date (From IA Input) *</label>
+              <label className="block font-bold text-sky-950 mb-1">DA Sanction Target Date *</label>
+              <input
+                type="date"
+                value={daTargetDate}
+                onChange={(e) => setDaTargetDate(e.target.value)}
+                className="w-full bg-white border-2 border-sky-400 rounded-lg px-2.5 py-1.5 text-sky-950 focus:outline-none focus:border-sky-600 font-bold"
+              />
+              <span className="text-[11px] text-slate-600 font-bold mt-0.5 block">Submitted by DA on Sanction Order</span>
+            </div>
+
+            <div>
+              <label className="block font-bold text-amber-950 mb-1">Target Completion Date (From IA Input) *</label>
               <input
                 type="date"
                 value={activeCompletionDate}
                 onChange={(e) => setTargetCompletionDate(e.target.value)}
-                className="w-full bg-slate-900 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-amber-300 focus:outline-none focus:border-amber-500 font-bold"
+                placeholder="YYYY-MM-DD"
+                className="w-full bg-white border-2 border-amber-400 rounded-lg px-2.5 py-1.5 text-amber-950 focus:outline-none focus:border-amber-600 font-bold"
               />
-              <span className="text-[10px] text-slate-500">Submitted by IA on workspace</span>
+              <span className="text-[11px] text-slate-600 font-bold mt-0.5 block">
+                {hasIaTargetDate ? 'Submitted by IA on workspace' : 'Awaiting IA target completion date input'}
+              </span>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-300 mb-1">Statutory Limit Days (Configurable) *</label>
+              <label className="block font-bold text-slate-800 mb-1">Statutory Limit Days (Configurable) *</label>
               <select
                 value={statutoryLimitDays}
                 onChange={(e) => setStatutoryLimitDays(Number(e.target.value))}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-amber-500 font-bold"
+                className="w-full bg-white border-2 border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-950 focus:outline-none focus:border-amber-600 font-bold"
               >
                 <option value={45}>45 Days Limit</option>
                 <option value={60}>60 Days Limit</option>
@@ -667,128 +915,124 @@ export const WorkDetailScrutiny: React.FC = () => {
                 <option value={120}>120 Days Limit</option>
               </select>
             </div>
-
-            <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-              <span className="text-slate-400 font-semibold">Scheduled Duration vs Limit:</span>
-              <div className="font-bold text-slate-100 text-sm">
-                {scheduledDurationDays} Days <span className="text-slate-500 font-normal">/ {statutoryLimitDays} Days Limit</span>
-              </div>
-              <div className={`text-[10px] font-bold ${isSlaBreached ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {isSlaBreached ? `-${Math.abs(slaMarginDays)} Days Overrun` : `+${slaMarginDays} Days Safety Buffer`}
-              </div>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-              <span className="text-slate-400 font-semibold">Timeline Risk Factor (0 to 1 Scale):</span>
-              <div className={`font-bold text-sm ${isSlaBreached ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {timelineRiskFactor.toFixed(2)} / 1.0
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-700 font-bold">DA vs IA Target Schedule Variance:</span>
+              <div className={`font-black text-sm ${!hasIaTargetDate ? 'text-slate-600' : (isIaExceedingDaTarget ? 'text-rose-800' : 'text-emerald-800')}`}>
+                {!hasIaTargetDate
+                  ? 'Awaiting IA Target Input'
+                  : isIaExceedingDaTarget
+                  ? `+${iaVsDaVarianceDays} Days Past DA Sanction Target`
+                  : `${Math.abs(iaVsDaVarianceDays)} Days Buffer vs DA Target`}
               </div>
-              <div className="text-[10px] text-slate-500">Statutory SLA risk scale computed from IA completion date</div>
+              <div className="text-[11px] text-slate-600 font-semibold">
+                DA Sanction Target: {daTargetDate || 'Not Set'} | IA Input: {hasIaTargetDate ? activeCompletionDate : 'Awaiting Input'}
+              </div>
             </div>
 
-            <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-              <span className="text-slate-400 font-semibold">SLA Status Classification:</span>
-              <div className={`font-bold text-sm ${isSlaBreached ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {isSlaBreached ? 'CRITICAL SLA BREACH' : 'COMPLIANT WITHIN LIMIT'}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-700 font-bold">SLA Status Classification:</span>
+              <div className={`font-black text-sm ${!hasIaTargetDate ? 'text-slate-600' : (isSlaBreached ? 'text-rose-800' : 'text-emerald-800')}`}>
+                {!hasIaTargetDate ? 'AWAITING IA SUBMISSION' : (isSlaBreached ? 'CRITICAL SLA BREACH' : 'COMPLIANT WITHIN LIMIT')}
               </div>
-              <div className="text-[10px] text-slate-500">Evaluated against {statutoryLimitDays}-day statutory limit</div>
+              <div className="text-[11px] text-slate-600 font-semibold">Evaluated against DA Sanction Target & {statutoryLimitDays}-day statutory limit</div>
             </div>
           </div>
 
           {/* 4-STAGE MILESTONE SCHEDULE BREAKDOWN */}
-          <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
-            <div className="font-bold text-slate-300 text-[11px] uppercase tracking-wider">
-              Statutory Schedule Milestone Breakdown ({scheduledDurationDays} Total Days from IA Target Date)
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+            <div className="font-black text-slate-900 text-xs uppercase tracking-wider">
+              Statutory Schedule Milestone Breakdown ({hasIaTargetDate ? `${scheduledDurationDays} Total Days from IA Target Date` : 'Awaiting IA Schedule Date'})
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
-              <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                <div className="text-slate-400">Sanction & Clearance</div>
-                <div className="font-bold text-sky-400">{Math.round(scheduledDurationDays * 0.2)} Days</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs">
+                <div className="text-slate-600 font-bold">Sanction & Clearance</div>
+                <div className="font-black text-sky-900 text-sm">{hasIaTargetDate ? `${Math.round(scheduledDurationDays * 0.2)} Days` : '-'}</div>
               </div>
-              <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                <div className="text-slate-400">Agency Tendering</div>
-                <div className="font-bold text-indigo-400">{Math.round(scheduledDurationDays * 0.2)} Days</div>
+              <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs">
+                <div className="text-slate-600 font-bold">Agency Tendering</div>
+                <div className="font-black text-indigo-900 text-sm">{hasIaTargetDate ? `${Math.round(scheduledDurationDays * 0.2)} Days` : '-'}</div>
               </div>
-              <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                <div className="text-slate-400">Construction Execution</div>
-                <div className="font-bold text-emerald-400">{Math.round(scheduledDurationDays * 0.5)} Days</div>
+              <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs">
+                <div className="text-slate-600 font-bold">Construction Execution</div>
+                <div className="font-black text-emerald-900 text-sm">{hasIaTargetDate ? `${Math.round(scheduledDurationDays * 0.5)} Days` : '-'}</div>
               </div>
-              <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                <div className="text-slate-400">Final Quality Certification</div>
-                <div className="font-bold text-amber-400">{Math.round(scheduledDurationDays * 0.1)} Days</div>
+              <div className="p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs">
+                <div className="text-slate-600 font-bold">Final Quality Certification</div>
+                <div className="font-black text-amber-900 text-sm">{hasIaTargetDate ? `${Math.round(scheduledDurationDays * 0.1)} Days` : '-'}</div>
               </div>
             </div>
           </div>
 
-          <div className={`p-2.5 rounded-lg text-[11px] ${isSlaBreached ? 'bg-rose-950/40 border border-rose-500/40 text-rose-300' : 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-300'}`}>
-            <strong>Statutory SLA Verification Finding:</strong> {isSlaBreached ? `CRITICAL SLA BREACH: Project target completion date (${activeCompletionDate}) submitted by IA yields a scheduled duration of ${scheduledDurationDays} days, exceeding the statutory ${statutoryLimitDays}-day limit by ${Math.abs(slaMarginDays)} days! Timeline Risk Factor: ${timelineRiskFactor.toFixed(2)} / 1.0` : `COMPLIANT: Project target completion date (${activeCompletionDate}) submitted by IA yields a scheduled duration of ${scheduledDurationDays} days, safely within the statutory ${statutoryLimitDays}-day limit (+${slaMarginDays} days safety buffer). Timeline Risk Factor: ${timelineRiskFactor.toFixed(2)} / 1.0`}
+          <div className={`p-3.5 rounded-xl text-xs font-semibold leading-relaxed border-2 ${!hasIaTargetDate ? 'bg-slate-50 border-slate-300 text-slate-800' : (isSlaBreached ? 'bg-rose-50 border-rose-400 text-rose-950' : 'bg-emerald-50 border-emerald-400 text-emerald-950')}`}>
+            <strong>Statutory SLA Verification Finding:</strong> {!hasIaTargetDate ? `AWAITING IA SUBMISSION: DA Sanction Order target completion date is set to ${daTargetDate}. Awaiting IA target completion date input on workspace to compare IA execution timeline against DA sanctioned target.` : (isIaExceedingDaTarget ? `CRITICAL SLA BREACH: IA proposed completion date (${activeCompletionDate}) exceeds DA sanctioned target date (${daTargetDate}) by ${iaVsDaVarianceDays} days! Scheduled duration: ${scheduledDurationDays} days vs ${statutoryLimitDays}-day statutory limit. Timeline Risk Factor: ${timelineRiskFactor.toFixed(2)} / 1.0` : `COMPLIANT: IA proposed completion date (${activeCompletionDate}) complies with DA sanctioned target date (${daTargetDate}). Scheduled duration: ${scheduledDurationDays} days safely within ${statutoryLimitDays}-day statutory limit (+${Math.abs(iaVsDaVarianceDays)} days safety buffer vs DA target). Timeline Risk Factor: ${timelineRiskFactor.toFixed(2)} / 1.0`)}
           </div>
         </CardContent>
       </Card>
 
       {/* STEP 3: DYNAMIC EXISTING GOVERNMENT RECORD CHECK */}
       {govtChecks && (
-        <Card className="border-sky-500/30 bg-slate-950">
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm font-bold text-sky-400 flex items-center space-x-2">
-              <Database size={16} />
+        <Card className="border-2 border-slate-200 bg-white shadow-xs">
+          <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+            <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center space-x-2">
+              <Database size={17} className="text-sky-700" />
               <span>Existing Government Record Check (Multi-Source Verification)</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-xs">
+          <CardContent className="space-y-4 text-xs pt-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-200 flex items-center space-x-1.5">
-                    <Database size={14} className="text-sky-400" />
+                  <span className="font-bold text-slate-950 flex items-center space-x-1.5">
+                    <Database size={15} className="text-sky-700" />
                     <span>MPLADS Internal Records</span>
                   </span>
-                  <Badge variant={mlMatch ? 'warning' : 'success'}>
+                  <Badge variant={mlMatch ? 'warning' : 'success'} className="font-bold">
                     {mlMatch ? 'Possible Match' : 'No Match'}
                   </Badge>
                 </div>
-                <div className="text-slate-400">Checked: <strong>{govtChecks.mplads.records_checked} district works</strong></div>
+                <div className="text-slate-700 font-medium">Checked: <strong className="text-slate-950 font-bold">{govtChecks.mplads.records_checked} district works</strong></div>
                 {mlMatch && (
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800 text-[11px] space-y-1">
-                    <div className="font-bold text-sky-300">Closest Match: {mlMatch.work_id}</div>
-                    <div className="text-slate-300">{mlMatch.title}</div>
-                    <div className="text-amber-400">
+                  <div className="p-2.5 bg-white rounded-lg border border-amber-300 text-xs space-y-1">
+                    <div className="font-black text-sky-900">Closest Match: {mlMatch.work_id}</div>
+                    <div className="text-slate-950 font-bold">{mlMatch.title}</div>
+                    <div className="text-amber-900 font-black">
                       Distance: {mlMatch.distance_meters}m | Similarity: {(Number((mlMatch as any).similarity_score ?? (mlMatch as any).similarity_percent ?? 0.87) * ( (mlMatch as any).similarity_score ? 100 : 1 )).toFixed(0)}%
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-200 flex items-center space-x-1.5">
-                    <Globe size={14} className="text-indigo-400" />
+                  <span className="font-bold text-slate-950 flex items-center space-x-1.5">
+                    <Globe size={15} className="text-indigo-700" />
                     <span>Open Govt Data (OGD)</span>
                   </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-200 text-slate-800">
                     {govtChecks.ogd.status}
                   </span>
                 </div>
-                <div className="text-slate-400">Matching Records: <strong>0</strong></div>
-                <p className="text-[11px] text-slate-400 bg-slate-950 p-2 rounded border border-slate-800">
+                <div className="text-slate-700 font-medium">Matching Records: <strong className="text-slate-950 font-bold">0</strong></div>
+                <p className="text-xs text-slate-700 font-medium bg-white p-2 rounded-lg border border-slate-200">
                   {govtChecks.ogd.reason}
                 </p>
               </div>
 
-              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-200 flex items-center space-x-1.5">
-                    <Globe size={14} className="text-indigo-400" />
+                  <span className="font-bold text-slate-950 flex items-center space-x-1.5">
+                    <Globe size={15} className="text-indigo-700" />
                     <span>Jansoochna State Portal</span>
                   </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-200 text-slate-800">
                     {govtChecks.jansoochna.status}
                   </span>
                 </div>
-                <div className="text-slate-400">Matching Records: <strong>0</strong></div>
-                <p className="text-[11px] text-slate-400 bg-slate-950 p-2 rounded border border-slate-800">
+                <div className="text-slate-700 font-medium">Matching Records: <strong className="text-slate-950 font-bold">0</strong></div>
+                <p className="text-xs text-slate-700 font-medium bg-white p-2 rounded-lg border border-slate-200">
                   {govtChecks.jansoochna.reason}
                 </p>
               </div>
@@ -796,34 +1040,34 @@ export const WorkDetailScrutiny: React.FC = () => {
 
             {/* DYNAMIC SIDE-BY-SIDE COMPARISON BOX */}
             {mlMatch && (
-              <div className="p-4 bg-amber-950/30 border border-amber-500/40 rounded-xl space-y-3">
-                <div className="flex justify-between items-center text-amber-400 font-bold text-sm">
+              <div className="p-4 bg-amber-50/80 border-2 border-amber-300 rounded-xl space-y-3 shadow-2xs">
+                <div className="flex justify-between items-center text-amber-950 font-black text-sm">
                   <span className="flex items-center space-x-2">
-                    <AlertTriangle size={18} />
+                    <AlertTriangle size={18} className="text-amber-700" />
                     <span>Possible Existing Work Found (Side-by-Side Comparison)</span>
                   </span>
-                  <Badge variant="danger">HUMAN REVIEW REQUIRED</Badge>
+                  <Badge variant="danger" className="font-bold">HUMAN REVIEW REQUIRED</Badge>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                    <div className="font-bold text-sky-400 uppercase text-[10px]">Active Sanctioned Work</div>
-                    <div className="font-bold text-slate-100">{recommendation?.title || 'Solar RO Water Purifier Plant'}</div>
-                    <div className="text-slate-400">Location: {recommendation?.address || 'Ward 4, Fort, Mumbai'}</div>
-                    <div className="text-slate-400">Sanctioned Cost: ₹{sanctionedAmount.toLocaleString('en-IN')}</div>
-                    <div className="text-slate-400">Category: {recommendation?.sector || 'Drinking Water Facilities'}</div>
+                  <div className="p-3.5 bg-white rounded-xl border border-amber-300 space-y-1 shadow-2xs">
+                    <div className="font-black text-sky-900 uppercase text-[11px] tracking-wider">Active Sanctioned Work</div>
+                    <div className="font-black text-slate-950 text-sm">{recommendation?.title || 'Solar RO Water Purifier Plant'}</div>
+                    <div className="text-slate-700 font-semibold">Location: {recommendation?.address || 'Ward 4, Fort, Mumbai'}</div>
+                    <div className="text-slate-700 font-semibold">Sanctioned Cost: <strong className="text-slate-950 font-black">₹{sanctionedAmount.toLocaleString('en-IN')}</strong></div>
+                    <div className="text-slate-700 font-semibold">Category: {recommendation?.sector || 'Drinking Water Facilities'}</div>
                   </div>
 
-                  <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                    <div className="font-bold text-amber-400 uppercase text-[10px]">Existing Matching Work ({mlMatch.work_id})</div>
-                    <div className="font-bold text-slate-100">{mlMatch.title}</div>
-                    <div className="text-slate-400">Location Distance: {mlMatch.distance_meters} meters away</div>
-                    <div className="text-slate-400">Sanctioned Cost: ₹{Math.round(sanctionedAmount * 0.94).toLocaleString('en-IN')} (6% cost variance)</div>
-                    <div className="text-slate-400">Status: SANCTIONED (Executing)</div>
+                  <div className="p-3.5 bg-white rounded-xl border border-amber-300 space-y-1 shadow-2xs">
+                    <div className="font-black text-amber-900 uppercase text-[11px] tracking-wider">Existing Matching Work ({mlMatch.work_id})</div>
+                    <div className="font-black text-slate-950 text-sm">{mlMatch.title}</div>
+                    <div className="text-slate-700 font-semibold">Location Distance: <strong className="text-amber-950 font-black">{mlMatch.distance_meters} meters away</strong></div>
+                    <div className="text-slate-700 font-semibold">Sanctioned Cost: <strong className="text-slate-950 font-black">₹{Math.round(sanctionedAmount * 0.94).toLocaleString('en-IN')}</strong> (6% cost variance)</div>
+                    <div className="text-slate-700 font-semibold">Status: <Badge variant="success" className="font-bold">SANCTIONED (Executing)</Badge></div>
                   </div>
                 </div>
 
-                <p className="text-[11px] text-amber-300 pt-1">
+                <p className="text-xs text-amber-950 pt-1 font-semibold leading-relaxed">
                   <strong>Why was this flagged?</strong> Same/similar work description, close geographic location ({mlMatch.distance_meters}m), same work category, and matching cost structure. Potential duplicate — review before proceeding with milestone payment.
                 </p>
               </div>
@@ -832,48 +1076,50 @@ export const WorkDetailScrutiny: React.FC = () => {
         </Card>
       )}
 
-      {/* STEP 4: DYNAMIC STORED RISK SCORE OVER TIME GRAPH (STANDARDIZED SVG TREND GRAPH UI) */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-slate-100 flex items-center justify-between">
+      {/* STEP 4: DYNAMIC STORED RISK SCORE OVER TIME GRAPH */}
+      <Card className="bg-white border-2 border-slate-200 shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <Activity size={16} className="text-rose-400" />
+              <Activity size={17} className="text-rose-700" />
               <span>Risk Over Time (Historical Stored Risk Timeline)</span>
             </span>
-            <span className={`text-xs font-mono font-bold ${isHighRisk ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <span className={`text-xs font-mono font-black px-3 py-1 rounded-lg border-2 ${
+              isHighRisk ? 'bg-rose-100 text-rose-950 border-rose-400' : 'bg-emerald-100 text-emerald-950 border-emerald-400'
+            }`}>
               Current Risk: {riskLevelLabel} — {currentRiskScore0to1} / 1.0 ({currentRiskScore100}/100)
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
-              <span>Risk Score Trajectory (0.00 – 1.00 Scale)</span>
-              <div className="flex items-center space-x-3 text-[10px]">
-                <span className="flex items-center space-x-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  <span className="text-slate-400">Low (&lt;0.50)</span>
+        <CardContent className="space-y-4 pt-4">
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold text-slate-800 gap-2">
+              <span>IA Daily Submission Timeline & Calculated Average Risk Score (0.00 – 1.00 Scale)</span>
+              <div className="flex items-center space-x-3 text-xs font-bold">
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-3 h-3 rounded-full bg-emerald-600"></span>
+                  <span className="text-slate-800">Low (&lt;0.50)</span>
                 </span>
-                <span className="flex items-center space-x-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                  <span className="text-slate-400">Medium (0.50-0.75)</span>
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                  <span className="text-slate-800">Medium (0.50-0.75)</span>
                 </span>
-                <span className="flex items-center space-x-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-                  <span className="text-slate-400">Critical (&gt;0.75)</span>
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-3 h-3 rounded-full bg-rose-600"></span>
+                  <span className="text-slate-800">Critical (&gt;0.75)</span>
                 </span>
               </div>
             </div>
 
-            {/* SVG Trend Graph */}
-            <div className="relative w-full overflow-hidden pt-2">
+            {/* SVG Trend Graph with Light Theme Styling */}
+            <div className="relative w-full overflow-hidden pt-2 bg-white rounded-xl border-2 border-slate-200 p-2 shadow-2xs">
               {(() => {
-                const graphWidth = 600;
-                const graphHeight = 160;
-                const padLeft = 40;
-                const padRight = 30;
-                const padTop = 20;
-                const padBottom = 30;
+                const graphWidth = 640;
+                const graphHeight = 175;
+                const padLeft = 45;
+                const padRight = 35;
+                const padTop = 25;
+                const padBottom = 35;
                 const plotWidth = graphWidth - padLeft - padRight;
                 const plotHeight = graphHeight - padTop - padBottom;
 
@@ -881,7 +1127,7 @@ export const WorkDetailScrutiny: React.FC = () => {
                   const x = padLeft + (idx / Math.max(activeRiskHistory.length - 1, 1)) * plotWidth;
                   const score0to1 = Math.min(Math.max(pt.risk_score / 100, 0), 1);
                   const y = padTop + plotHeight - score0to1 * plotHeight;
-                  return { x, y, score0to1, score100: pt.risk_score, date: pt.date };
+                  return { x, y, score0to1, score100: pt.risk_score, date: pt.date, itemsCount: pt.items_count, items: pt.items };
                 });
 
                 const pathD = points.length > 0 
@@ -893,14 +1139,14 @@ export const WorkDetailScrutiny: React.FC = () => {
                   : '';
 
                 return (
-                  <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} className="w-full h-auto text-slate-400">
+                  <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} className="w-full h-auto text-slate-700">
                     <defs>
-                      <linearGradient id="riskAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.35" />
-                        <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+                      <linearGradient id="riskAreaGradLight" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.25" />
+                        <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.03" />
                       </linearGradient>
-                      <linearGradient id="riskLineGrad" x1="0" y1="0" x2="1" y2="0">
+                      <linearGradient id="riskLineGradLight" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="#10b981" />
                         <stop offset="50%" stopColor="#f59e0b" />
                         <stop offset="100%" stopColor="#f43f5e" />
@@ -917,16 +1163,17 @@ export const WorkDetailScrutiny: React.FC = () => {
                             y1={yPos}
                             x2={graphWidth - padRight}
                             y2={yPos}
-                            stroke="#334155"
-                            strokeDasharray={val === 0 || val === 1 ? "none" : "3 3"}
-                            strokeWidth={val === 0 || val === 1 ? "1" : "0.5"}
+                            stroke="#cbd5e1"
+                            strokeDasharray={val === 0 || val === 1 ? "none" : "4 4"}
+                            strokeWidth={val === 0 || val === 1 ? "1.5" : "1"}
                           />
                           <text
                             x={padLeft - 8}
-                            y={yPos + 3}
+                            y={yPos + 4}
                             textAnchor="end"
-                            fontSize="9"
-                            fill="#94a3b8"
+                            fontSize="10"
+                            fontWeight="bold"
+                            fill="#0f172a"
                             className="font-mono"
                           >
                             {val.toFixed(2)}
@@ -936,15 +1183,15 @@ export const WorkDetailScrutiny: React.FC = () => {
                     })}
 
                     {/* Filled Area */}
-                    {areaD && <path d={areaD} fill="url(#riskAreaGrad)" />}
+                    {areaD && <path d={areaD} fill="url(#riskAreaGradLight)" />}
 
                     {/* Trend Polyline */}
                     {pathD && (
                       <path
                         d={pathD}
                         fill="none"
-                        stroke="url(#riskLineGrad)"
-                        strokeWidth="3"
+                        stroke="url(#riskLineGradLight)"
+                        strokeWidth="3.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -952,47 +1199,62 @@ export const WorkDetailScrutiny: React.FC = () => {
 
                     {/* Data Node Markers & Badges */}
                     {points.map((pt, idx) => (
-                      <g key={idx} className="group">
+                      <g key={idx} className="group cursor-pointer">
+                        {/* Vertical Drop Line to X-Axis */}
+                        <line
+                          x1={pt.x}
+                          y1={pt.y}
+                          x2={pt.x}
+                          y2={padTop + plotHeight}
+                          stroke="#94a3b8"
+                          strokeDasharray="2 2"
+                          strokeWidth="1.2"
+                        />
+                        
+                        {/* Node Circle */}
                         <circle
                           cx={pt.x}
                           cy={pt.y}
-                          r="5"
-                          fill={pt.score0to1 >= 0.75 ? "#f43f5e" : pt.score0to1 >= 0.5 ? "#f59e0b" : "#10b981"}
-                          stroke="#020617"
-                          strokeWidth="2"
+                          r="6.5"
+                          fill={pt.score0to1 >= 0.75 ? "#e11d48" : pt.score0to1 >= 0.5 ? "#d97706" : "#059669"}
+                          stroke="#ffffff"
+                          strokeWidth="2.5"
                         />
-                        {/* Score Label above node */}
+                        
+                        {/* Average Risk Badge above Node */}
                         <rect
-                          x={pt.x - 16}
-                          y={pt.y - 18}
-                          width="32"
-                          height="13"
-                          rx="3"
-                          fill="#0f172a"
-                          stroke={pt.score0to1 >= 0.75 ? "#f43f5e" : pt.score0to1 >= 0.5 ? "#f59e0b" : "#10b981"}
-                          strokeWidth="0.8"
+                          x={pt.x - 20}
+                          y={pt.y - 21}
+                          width="40"
+                          height="16"
+                          rx="4"
+                          fill="#ffffff"
+                          stroke={pt.score0to1 >= 0.75 ? "#e11d48" : pt.score0to1 >= 0.5 ? "#d97706" : "#059669"}
+                          strokeWidth="1.5"
                         />
                         <text
                           x={pt.x}
                           y={pt.y - 9}
                           textAnchor="middle"
-                          fontSize="8.5"
-                          fontWeight="bold"
-                          fill={pt.score0to1 >= 0.75 ? "#fda4af" : pt.score0to1 >= 0.5 ? "#fde68a" : "#6ee7b7"}
+                          fontSize="9.5"
+                          fontWeight="900"
+                          fill={pt.score0to1 >= 0.75 ? "#9f1239" : pt.score0to1 >= 0.5 ? "#92400e" : "#065f46"}
                           className="font-mono"
                         >
                           {pt.score0to1.toFixed(2)}
                         </text>
-                        {/* X Axis Date Label */}
+
+                        {/* X-Axis Submission Date Label */}
                         <text
                           x={pt.x}
-                          y={graphHeight - 8}
+                          y={graphHeight - 10}
                           textAnchor="middle"
-                          fontSize="9"
-                          fill="#94a3b8"
+                          fontSize="10"
+                          fontWeight="800"
+                          fill="#0f172a"
                           className="font-mono"
                         >
-                          {pt.date.slice(5)}
+                          {pt.date}
                         </text>
                       </g>
                     ))}
@@ -1001,103 +1263,137 @@ export const WorkDetailScrutiny: React.FC = () => {
               })()}
             </div>
 
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-1">
-              <div className="font-bold text-rose-300">Risk Audit Findings & Triggers:</div>
-              <ul className="list-disc list-inside text-slate-400 text-[11px] space-y-0.5">
-                <li>Payment recorded (₹{(totalDisbursed / 100000).toFixed(2)}L paid, {paymentPercentage}% of budget).</li>
-                <li>Physical execution reported at {physicalProgress}% (+{divergenceDelta}% divergence delta).</li>
-                {hasIaUploadedPhotos ? (
-                  <li>2-Photo pHash Verification outputted Photo Reuse Risk Score: {photoReuseRisk0to1} / 1.0 ({isPhotoReused ? 'REUSED PHOTO DETECTED' : 'PASSED INTEGRITY'}).</li>
-                ) : (
-                  <li>Awaiting field evidence photo upload from Implementing Agency on IA portal.</li>
-                )}
-                {hasIaSubmittedVoucher && (
-                  <li>OCR Voucher Scanner Output: Claim ₹{ocrClaimedAmount.toLocaleString('en-IN')} vs Sanctioned ₹{sanctionedAmount.toLocaleString('en-IN')} ({isPriceWithinSanction ? 'PASSED' : 'OVERRUN'}). Bill Date: {ocrBillDateStr} ({isOcrDateWithinSla ? 'WITHIN SLA' : 'SLA OVERRUN'}).</li>
-                )}
-              </ul>
+            {/* Daily Submission & Average Risk Calculation Audit Breakdown */}
+            <div className="p-3.5 bg-white rounded-xl border border-slate-200 text-xs space-y-2.5 shadow-2xs">
+              <div className="font-extrabold text-slate-950 flex items-center justify-between pb-1.5 border-b border-slate-200">
+                <span className="flex items-center gap-1.5 text-rose-800 font-bold">
+                  <Activity size={15} />
+                  <span>IA Submissions & Daily Average Risk Calculation Log:</span>
+                </span>
+                <span className="text-xs text-slate-700 font-bold font-mono">
+                  {activeRiskHistory.length} Submission Date(s) Plotted
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-200 space-y-2">
+                {activeRiskHistory.map((item, idx) => (
+                  <div key={idx} className="pt-2 first:pt-0 space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 text-xs">
+                          📅 {item.date}
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded text-xs font-mono font-black border ${
+                          item.risk_score >= 75
+                            ? 'bg-rose-100 text-rose-950 border-rose-300'
+                            : item.risk_score >= 50
+                            ? 'bg-amber-100 text-amber-950 border-amber-300'
+                            : 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                        }`}>
+                          Daily Avg Risk: {(item.risk_score / 100).toFixed(2)} / 1.0 ({item.risk_score}/100) — {item.risk_level}
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-700 font-bold">
+                        {item.items_count} IA Submission Event(s) Evaluated
+                      </span>
+                    </div>
+
+                    {/* Itemized list of IA submissions on that date */}
+                    <ul className="pl-3 list-disc space-y-1 text-xs text-slate-800">
+                      {item.items.map((sub, sIdx) => (
+                        <li key={sIdx} className="leading-relaxed font-medium">
+                          <strong className="text-slate-950 font-bold">{sub.title}:</strong>{' '}
+                          <span className="text-slate-800">{sub.desc}</span>{' '}
+                          <span className="text-xs font-mono text-slate-600 font-bold">(Risk: {sub.score}/100)</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* STEP 5: DEEP CONVNET (4-LAYER CONV2D + SOFTMAX FUNCTIONAL) OUTPUT */}
-      <Card className="border-indigo-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-indigo-300 flex items-center justify-between">
+      {/* STEP 5: DEEP CONVNET OUTPUT */}
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <Cpu size={18} className="text-emerald-400" />
+              <Cpu size={18} className="text-emerald-700" />
               <span>Deep ConvNet (4-Layer Conv2D + Softmax Functional) Output</span>
             </span>
             {hasIaUploadedPhotos ? (
-              <Badge variant={isPhotoReused ? 'danger' : 'success'}>
+              <Badge variant={isPhotoReused ? 'danger' : 'success'} className="font-bold">
                 {isPhotoReused ? 'POTENTIAL REUSED PHOTO' : 'PASSED INTEGRITY'}
               </Badge>
             ) : (
-              <Badge variant="warning">AWAITING IA PHOTO UPLOAD</Badge>
+              <Badge variant="warning" className="font-bold">AWAITING IA PHOTO UPLOAD</Badge>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-xs">
+        <CardContent className="space-y-4 text-xs pt-4">
           {hasIaUploadedPhotos ? (
             <>
               {/* DEEP CNN SOFTMAX PROBABILITY BREAKDOWN */}
-              <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
-                <div className="font-bold text-sky-400 text-[11px] uppercase tracking-wider flex justify-between">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div className="font-black text-sky-950 text-xs uppercase tracking-wider flex justify-between">
                   <span>Softmax Classification Probabilities (dim=1)</span>
-                  <span className="text-emerald-400">Classified: GENUINE_CONSTRUCTION_SITE (96.4%)</span>
+                  <span className="text-emerald-800 font-bold">Classified: GENUINE_CONSTRUCTION_SITE (96.4%)</span>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
-                  <div className="p-2.5 bg-slate-950 rounded-lg border border-emerald-500/40 space-y-0.5">
-                    <div className="text-slate-400 font-semibold">GENUINE_CONSTRUCTION_SITE</div>
-                    <div className="font-bold text-emerald-400 text-sm">96.4%</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2.5 bg-white rounded-lg border-2 border-emerald-300 space-y-0.5 shadow-2xs">
+                    <div className="text-slate-700 font-bold">GENUINE_CONSTRUCTION_SITE</div>
+                    <div className="font-black text-emerald-800 text-sm">96.4%</div>
                   </div>
-                  <div className="p-2.5 bg-slate-950 rounded-lg border border-amber-500/30 space-y-0.5">
-                    <div className="text-slate-400 font-semibold">POTENTIAL_REUSED_STOCK_PHOTO</div>
-                    <div className="font-bold text-amber-400 text-sm">2.8%</div>
+                  <div className="p-2.5 bg-white rounded-lg border-2 border-amber-300 space-y-0.5 shadow-2xs">
+                    <div className="text-slate-700 font-bold">POTENTIAL_REUSED_STOCK_PHOTO</div>
+                    <div className="font-black text-amber-800 text-sm">2.8%</div>
                   </div>
-                  <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 space-y-0.5">
-                    <div className="text-slate-400 font-semibold">INDOOR_OFFICE_IRRELEVANT</div>
-                    <div className="font-bold text-slate-300 text-sm">0.5%</div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-0.5 shadow-2xs">
+                    <div className="text-slate-700 font-bold">INDOOR_OFFICE_IRRELEVANT</div>
+                    <div className="font-black text-slate-900 text-sm">0.5%</div>
                   </div>
-                  <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 space-y-0.5">
-                    <div className="text-slate-400 font-semibold">POOR_QUALITY_BLURRY</div>
-                    <div className="font-bold text-slate-300 text-sm">0.3%</div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-0.5 shadow-2xs">
+                    <div className="text-slate-700 font-bold">POOR_QUALITY_BLURRY</div>
+                    <div className="font-black text-slate-900 text-sm">0.3%</div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                  <span className="text-slate-400 font-semibold">Perceptual Hash (pHash):</span>
-                  <div className="font-mono font-bold text-sky-400 text-xs">{phash1}</div>
-                  <div className="text-[10px] text-slate-500">64-bit DCT perceptual image fingerprint</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-slate-700 font-bold">Perceptual Hash (pHash):</span>
+                  <div className="font-mono font-black text-sky-950 text-xs">{phash1}</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">64-bit DCT perceptual image fingerprint</div>
                 </div>
 
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                  <span className="text-slate-400 font-semibold">GPS Distance Offset:</span>
-                  <div className="font-bold text-amber-400 text-xs">{gpsOffsetMeters}m from registered site</div>
-                  <div className="text-[10px] text-slate-500">PostGIS ST_Distance (SRID 4326)</div>
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-slate-700 font-bold">GPS Distance Offset:</span>
+                  <div className="font-black text-amber-950 text-xs">{gpsOffsetMeters}m from registered site</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">PostGIS ST_Distance (SRID 4326)</div>
                 </div>
 
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                  <span className="text-slate-400 font-semibold">Hamming Distance Match:</span>
-                  <div className={`font-bold ${isPhotoReused ? 'text-rose-400' : 'text-emerald-400'} text-xs`}>
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-slate-700 font-bold">Hamming Distance Match:</span>
+                  <div className={`font-black ${isPhotoReused ? 'text-rose-900' : 'text-emerald-900'} text-xs`}>
                     {hammingDist} bits ({isPhotoReused ? '< 5 threshold' : '>= 5 threshold'})
                   </div>
-                  <div className="text-[10px] text-slate-500">Computed against IA submitted evidence</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">Computed against IA submitted evidence</div>
                 </div>
               </div>
 
-              <div className={`p-3 rounded-xl text-[11px] leading-relaxed ${isPhotoReused ? 'bg-rose-950/40 border border-rose-500/40 text-rose-300' : 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-300'}`}>
+              <div className={`p-3.5 rounded-xl text-xs leading-relaxed font-semibold border-2 ${isPhotoReused ? 'bg-rose-50 border-rose-400 text-rose-950' : 'bg-emerald-50 border-emerald-400 text-emerald-950'}`}>
                 <strong>Detection Signal Logged:</strong> {isPhotoReused ? `REUSED_PHOTO_DETECTED: pHash Hamming distance ${hammingDist} (< 5 threshold match to prior site evidence) | GPS_MISMATCH_EXCEEDS_RADIUS: Photo location is ${gpsOffsetMeters}m from registered site` : `PASSED INTEGRITY: pHash Hamming distance is ${hammingDist} bits (>= 5 threshold). Photos verified as distinct original site evidence.`}
               </div>
             </>
           ) : (
-            <div className="p-6 bg-slate-900/50 rounded-xl border border-slate-800 text-center space-y-2">
-              <UploadCloud size={28} className="mx-auto text-indigo-400" />
-              <div className="font-semibold text-slate-200">Awaiting Site Evidence Upload from Implementing Agency</div>
-              <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+            <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 text-center space-y-2">
+              <UploadCloud size={30} className="mx-auto text-indigo-700" />
+              <div className="font-extrabold text-slate-950 text-sm">Awaiting Site Evidence Upload from Implementing Agency</div>
+              <p className="text-xs text-slate-700 max-w-md mx-auto font-medium">
                 Once the Implementing Agency (IA) uploads 2 site evidence photographs on their IA Workspace, the Deep ConvNet Softmax Classifier, pHash 2-Photo Comparator, and EXIF Distance Engine will process and render live risk analysis here.
               </p>
             </div>
@@ -1105,139 +1401,149 @@ export const WorkDetailScrutiny: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* MULTIMODAL IMAGE + BUDGET RISK MODEL EVALUATION BOX */}
-      <Card className="border-indigo-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-indigo-400 flex items-center justify-between">
+      {/* STEP 6: MULTIMODAL IMAGE + BUDGET RISK MODEL EVALUATION BOX */}
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <Cpu size={16} />
+              <Cpu size={17} className="text-indigo-700" />
               <span>Multimodal AI Image + Budget Risk Evaluation Output (0 to 1 Scale)</span>
             </span>
-            <span className="text-xs font-mono font-bold text-rose-400">
+            <span className={`text-xs font-mono font-black px-3 py-1 rounded-lg border-2 ${
+              isHighRisk ? 'bg-rose-100 text-rose-950 border-rose-400' : 'bg-emerald-100 text-emerald-950 border-emerald-400'
+            }`}>
               Output Risk Score: {currentRiskScore0to1} / 1.0
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-          <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-slate-400 font-semibold">Claimed Budget Value:</span>
-            <div className="font-bold text-sky-400 text-sm">₹{sanctionedAmount.toLocaleString('en-IN')}</div>
-            <div className="text-[10px] text-slate-500">Sanctioned allocation value</div>
+        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs pt-4">
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+            <span className="text-slate-700 font-bold">Claimed Budget Value:</span>
+            <div className="font-black text-sky-950 text-sm">
+              {hasPaymentDisbursedInput ? `₹${(hasIaSubmittedVoucher ? ocrClaimedAmount : totalDisbursed).toLocaleString('en-IN')}` : '₹0 (Awaiting IA Claim)'}
+            </div>
+            <div className="text-[11px] text-slate-600 font-semibold">Sanctioned: ₹{sanctionedAmount.toLocaleString('en-IN')}</div>
           </div>
 
-          <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-slate-400 font-semibold">Visual Site Maturity Index:</span>
-            <div className="font-bold text-emerald-400 text-sm">{physicalProgress}% Complete</div>
-            <div className="text-[10px] text-slate-500">Extracted from site image feature maps</div>
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+            <span className="text-slate-700 font-bold">Visual Site Maturity Index:</span>
+            <div className="font-black text-emerald-900 text-sm">{physicalProgress}% Complete</div>
+            <div className="text-[11px] text-slate-600 font-semibold">Extracted from feature maps</div>
           </div>
 
-          <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-slate-400 font-semibold">Budget Density Ratio:</span>
-            <div className="font-bold text-amber-400 text-sm">0.78 Utilization</div>
-            <div className="text-[10px] text-slate-500">Baseline category density ratio</div>
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+            <span className="text-slate-700 font-bold">Budget Density Ratio:</span>
+            <div className="font-black text-amber-950 text-sm">
+              {hasPaymentDisbursedInput ? (paymentPercentage / 100).toFixed(2) : '0.00'} Utilization
+            </div>
+            <div className="text-[11px] text-slate-600 font-semibold">Claimed vs sanctioned ratio</div>
           </div>
 
-          <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-slate-400 font-semibold">Normalized Risk Score (0 to 1):</span>
-            <div className="font-bold text-rose-400 text-sm">{currentRiskScore0to1} / 1.0</div>
-            <div className="text-[10px] text-slate-500">Sigmoid neural activation scale</div>
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+            <span className="text-slate-700 font-bold">Normalized Risk Score:</span>
+            <div className={`font-black text-sm ${isHighRisk ? 'text-rose-900' : 'text-emerald-900'}`}>{currentRiskScore0to1} / 1.0</div>
+            <div className="text-[11px] text-slate-600 font-semibold">Sigmoid neural activation</div>
           </div>
 
-          <div className="md:col-span-4 p-2.5 bg-indigo-950/30 border border-indigo-500/30 rounded-lg text-indigo-200 text-[11px]">
-            <strong>AI Multimodal Verification Finding:</strong> {isHighRisk ? `High visual/budget mismatch: Image visual features indicate ${physicalProgress}% structural maturity against claimed budget ₹${sanctionedAmount.toLocaleString('en-IN')}. Normalized Risk Score: ${currentRiskScore0to1} / 1.0 (${riskLevelLabel})` : `Budget utilization aligns with visual site evidence. Normalized Risk Score: ${currentRiskScore0to1} / 1.0 (${riskLevelLabel})`}
+          <div className={`md:col-span-4 p-3.5 rounded-xl border-2 text-xs font-semibold leading-relaxed ${
+            isHighRisk ? 'bg-rose-50 border-rose-400 text-rose-950' : 'bg-emerald-50 border-emerald-400 text-emerald-950'
+          }`}>
+            <strong>AI Multimodal Verification Finding:</strong> {!hasPhysicalProgressInput && !hasPaymentDisbursedInput ? `Awaiting IA field execution submission. Claimed budget: ₹0, Visual maturity: 0%. Normalized Risk Score: 0.15 / 1.0 (LOW)` : (isHighRisk ? `High visual/budget mismatch: Image visual features indicate ${physicalProgress}% structural maturity against claimed budget ₹${(hasIaSubmittedVoucher ? ocrClaimedAmount : totalDisbursed).toLocaleString('en-IN')} (${paymentPercentage}% of sanctioned amount). Normalized Risk Score: ${currentRiskScore0to1} / 1.0 (${riskLevelLabel})` : `Budget utilization (${(paymentPercentage / 100).toFixed(2)}) aligns with verified visual site evidence (${physicalProgress}% complete). Normalized Risk Score: ${currentRiskScore0to1} / 1.0 (${riskLevelLabel})`)}
           </div>
         </CardContent>
       </Card>
 
-      {/* STEP 6: pHASH 2-PHOTO VERIFICATION ENGINE (2 IA SUBMITTED PHOTOS COMPARISON) */}
-      <Card className="border-indigo-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-indigo-400 flex items-center justify-between">
+      {/* STEP 7: pHASH 2-PHOTO VERIFICATION ENGINE */}
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <Camera size={16} />
+              <Camera size={17} className="text-indigo-700" />
               <span>pHash 2-Photo Verification Engine (2 IA Submitted Photos Comparison)</span>
             </span>
             {hasIaUploadedPhotos ? (
-              <Badge variant={isPhotoReused ? 'danger' : 'success'}>
+              <Badge variant={isPhotoReused ? 'danger' : 'success'} className="font-bold">
                 Photo Reuse Risk: {photoReuseRisk0to1} / 1.0 ({isPhotoReused ? 'CRITICAL' : 'LOW'})
               </Badge>
             ) : (
-              <Badge variant="warning">AWAITING IA SUBMISSION</Badge>
+              <Badge variant="warning" className="font-bold">AWAITING IA SUBMISSION</Badge>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-xs">
+        <CardContent className="space-y-4 text-xs pt-4">
           {hasIaUploadedPhotos ? (
             <>
               {/* 2-PHOTO SIDE-BY-SIDE COMPARISON BOX */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
-                  <div className="font-bold text-sky-400 flex items-center space-x-1.5">
-                    <ImageIcon size={14} />
-                    <span>Image 1: IA Submitted Baseline Photo ({image1Name})</span>
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="font-black text-sky-950 flex items-center space-x-1.5 text-xs">
+                    <ImageIcon size={15} />
+                    <span>Image 1: IA Baseline Photo ({image1Name})</span>
                   </div>
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800 space-y-1 text-[11px]">
-                    <div><span className="text-slate-400">Filename:</span> <strong className="text-slate-200">{image1Name}</strong></div>
-                    <div><span className="text-slate-400">pHash (64-bit DCT):</span> <strong className="font-mono text-sky-400 font-bold">{phash1}</strong></div>
-                    <div><span className="text-slate-400">GPS EXIF:</span> <strong className="text-slate-200">18.9180° N, 72.8310° E</strong></div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-1 text-xs">
+                    <div><span className="text-slate-600 font-bold">Filename:</span> <strong className="text-slate-950 font-bold">{image1Name}</strong></div>
+                    <div><span className="text-slate-600 font-bold">pHash (64-bit DCT):</span> <strong className="font-mono text-sky-900 font-black">{phash1}</strong></div>
+                    <div><span className="text-slate-600 font-bold">GPS EXIF:</span> <strong className="text-slate-900 font-bold">18.9180° N, 72.8310° E</strong></div>
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
-                  <div className="font-bold text-indigo-400 flex items-center space-x-1.5">
-                    <ImageIcon size={14} />
-                    <span>Image 2: IA Submitted Execution Photo ({image2Name})</span>
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="font-black text-indigo-950 flex items-center space-x-1.5 text-xs">
+                    <ImageIcon size={15} />
+                    <span>Image 2: IA Execution Photo ({image2Name})</span>
                   </div>
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800 space-y-1 text-[11px]">
-                    <div><span className="text-slate-400">Filename:</span> <strong className="text-slate-200">{image2Name}</strong></div>
-                    <div><span className="text-slate-400">pHash (64-bit DCT):</span> <strong className="font-mono text-indigo-400 font-bold">{phash2}</strong></div>
-                    <div><span className="text-slate-400">GPS EXIF:</span> <strong className="text-slate-200">18.9142° N, 72.8350° E</strong></div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-1 text-xs">
+                    <div><span className="text-slate-600 font-bold">Filename:</span> <strong className="text-slate-950 font-bold">{image2Name}</strong></div>
+                    <div><span className="text-slate-600 font-bold">pHash (64-bit DCT):</span> <strong className="font-mono text-indigo-900 font-black">{phash2}</strong></div>
+                    <div><span className="text-slate-600 font-bold">GPS EXIF:</span> <strong className="text-slate-900 font-bold">18.9142° N, 72.8350° E</strong></div>
                   </div>
                 </div>
               </div>
 
               {/* pHASH DIFFERENCE METRICS & 0-1 RISK SCORE */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-                  <span className="text-slate-400 font-semibold">Hamming Distance:</span>
-                  <div className={`font-bold ${isPhotoReused ? 'text-rose-400' : 'text-emerald-400'} text-sm`}>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-0.5">
+                  <span className="text-slate-700 font-bold">Hamming Distance:</span>
+                  <div className={`font-black ${isPhotoReused ? 'text-rose-900' : 'text-emerald-900'} text-sm`}>
                     {hammingDist} Bits ({isPhotoReused ? '< 5 Threshold' : '>= 5 Threshold'})
                   </div>
-                  <div className="text-[10px] text-slate-500">Bitwise XOR difference count</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">Bitwise XOR difference</div>
                 </div>
 
-                <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-                  <span className="text-slate-400 font-semibold">Perceptual Similarity:</span>
-                  <div className="font-bold text-amber-400 text-sm">{perceptualSimPct}% Match</div>
-                  <div className="text-[10px] text-slate-500">64-bit DCT index</div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-0.5">
+                  <span className="text-slate-700 font-bold">Perceptual Similarity:</span>
+                  <div className="font-black text-amber-950 text-sm">{perceptualSimPct}% Match</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">64-bit DCT index</div>
                 </div>
 
-                <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-                  <span className="text-slate-400 font-semibold">Photo Reuse Risk Score (0 to 1):</span>
-                  <div className={`font-bold ${isPhotoReused ? 'text-rose-400' : 'text-emerald-400'} text-sm`}>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-0.5">
+                  <span className="text-slate-700 font-bold">Photo Reuse Risk:</span>
+                  <div className={`font-black ${isPhotoReused ? 'text-rose-900' : 'text-emerald-900'} text-sm`}>
                     {photoReuseRisk0to1} / 1.0
                   </div>
-                  <div className="text-[10px] text-slate-500">Sigmoid photo risk scale</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">Sigmoid risk scale</div>
                 </div>
 
-                <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-0.5">
-                  <span className="text-slate-400 font-semibold">Classification Result:</span>
-                  <div className={`font-bold ${isPhotoReused ? 'text-rose-400' : 'text-emerald-400'} text-sm`}>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-0.5">
+                  <span className="text-slate-700 font-bold">Classification:</span>
+                  <div className={`font-black ${isPhotoReused ? 'text-rose-900' : 'text-emerald-900'} text-sm`}>
                     {isPhotoReused ? 'REUSED EVIDENCE' : 'ORIGINAL SITE PHOTOS'}
                   </div>
-                  <div className="text-[10px] text-slate-500">Duplicate detection status</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">Duplicate detection</div>
                 </div>
               </div>
 
-              <div className={`p-2.5 rounded-lg text-[11px] ${isPhotoReused ? 'bg-rose-950/40 border border-rose-500/40 text-rose-300' : 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-300'}`}>
+              <div className={`p-3.5 rounded-xl text-xs font-semibold leading-relaxed border-2 ${
+                isPhotoReused ? 'bg-rose-50 border-rose-400 text-rose-950' : 'bg-emerald-50 border-emerald-400 text-emerald-950'
+              }`}>
                 <strong>pHash Photo Verification Finding:</strong> {isPhotoReused ? `POTENTIAL REUSED PHOTO DETECTED — Image 1 (${image1Name}) and Image 2 (${image2Name}) submitted by IA have a Hamming distance of ${hammingDist} bits (< 5 threshold), indicating ${perceptualSimPct}% perceptual image overlap. Photo Reuse Risk Score: ${photoReuseRisk0to1} / 1.0 (CRITICAL).` : `DISTINCT ORIGINAL SITE PHOTOS CONFIRMED — Image 1 (${image1Name}) and Image 2 (${image2Name}) submitted by IA have a Hamming distance of ${hammingDist} bits (>= 5 threshold). Photo Reuse Risk Score: ${photoReuseRisk0to1} / 1.0 (PASSED INTEGRITY).`}
               </div>
             </>
           ) : (
-            <div className="p-6 bg-slate-900/50 rounded-xl border border-slate-800 text-center space-y-2">
-              <UploadCloud size={28} className="mx-auto text-indigo-400" />
-              <div className="font-semibold text-slate-200">Awaiting 2 Site Evidence Photographs from Implementing Agency</div>
-              <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+            <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 text-center space-y-2">
+              <UploadCloud size={30} className="mx-auto text-indigo-700" />
+              <div className="font-extrabold text-slate-950 text-sm">Awaiting 2 Site Evidence Photographs from Implementing Agency</div>
+              <p className="text-xs text-slate-700 max-w-md mx-auto font-medium">
                 No site evidence photos have been uploaded by the Implementing Agency (IA) yet for this work. Upload 2 site evidence photographs on the IA Portal workspace to run pHash 2-Photo Verification & 0-to-1 Risk Scoring.
               </p>
             </div>
@@ -1245,50 +1551,50 @@ export const WorkDetailScrutiny: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* STEP 7: OPTICAL CHARACTER RECOGNITION (OCR) VOUCHER & SLIP SCANNER ENGINE */}
-      <Card className="border-sky-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-sky-400 flex items-center justify-between">
+      {/* STEP 8: OCR VOUCHER & SLIP SCANNER ENGINE */}
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <FileCheck size={18} />
+              <FileCheck size={18} className="text-sky-700" />
               <span>Optical Character Recognition (OCR) Voucher & Slip Scanner Engine</span>
             </span>
             {hasIaSubmittedVoucher ? (
-              <Badge variant={isOcrValid ? 'success' : 'danger'}>
+              <Badge variant={isOcrValid ? 'success' : 'danger'} className="font-bold">
                 OCR Compliance Risk: {ocrComplianceRiskScore0to1} / 1.0 ({isOcrValid ? 'PASSED' : 'BREACH'})
               </Badge>
             ) : (
-              <Badge variant="warning">AWAITING IA VOUCHER SLIP</Badge>
+              <Badge variant="warning" className="font-bold">AWAITING IA VOUCHER SLIP</Badge>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-xs">
+        <CardContent className="space-y-4 text-xs pt-4">
           {hasIaSubmittedVoucher ? (
             <>
-              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-slate-400 font-semibold">Scanned Voucher Slip File:</span>
-                <div className="font-mono font-bold text-sky-300 text-xs flex items-center space-x-2">
-                  <UploadCloud size={14} className="text-sky-400" />
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-700 font-bold">Scanned Voucher Slip File:</span>
+                <div className="font-mono font-black text-sky-950 text-xs flex items-center space-x-2">
+                  <UploadCloud size={15} className="text-sky-700" />
                   <span>{ocrVoucherFileName}</span>
-                  <span className="text-slate-500 text-[10px]">(Ref: {activePaymentClaim?.invoice_ref || 'INV-PWD-2026-084'})</span>
+                  <span className="text-slate-600 text-xs font-bold">(Ref: {activePaymentClaim?.invoice_ref || 'INV-PWD-2026-084'})</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* RULE 1: PRICE SANCTION CHECK */}
-                <div className={`p-3 bg-slate-900 rounded-xl border ${isPriceWithinSanction ? 'border-emerald-500/40' : 'border-rose-500/50'} space-y-2`}>
+                <div className={`p-3.5 bg-slate-50 rounded-xl border-2 ${isPriceWithinSanction ? 'border-emerald-400' : 'border-rose-400'} space-y-2`}>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-200">1. OCR Price Sanction Verification</span>
-                    <Badge variant={isPriceWithinSanction ? 'success' : 'danger'}>
+                    <span className="font-black text-slate-950">1. OCR Price Sanction Verification</span>
+                    <Badge variant={isPriceWithinSanction ? 'success' : 'danger'} className="font-bold">
                       {isPriceWithinSanction ? 'PRICE <= SANCTION (PASSED)' : 'BUDGET OVERRUN BREACH'}
                     </Badge>
                   </div>
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800 space-y-1 text-[11px]">
-                    <div><span className="text-slate-400">OCR Extracted Invoice Claim:</span> <strong className="text-sky-400 font-bold">₹{ocrClaimedAmount.toLocaleString('en-IN')}</strong></div>
-                    <div><span className="text-slate-400">Sanctioned Budget Limit:</span> <strong className="text-slate-200 font-bold">₹{sanctionedAmount.toLocaleString('en-IN')}</strong></div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-1 text-xs">
+                    <div><span className="text-slate-600 font-bold">Extracted Claim:</span> <strong className="text-sky-950 font-black">₹{ocrClaimedAmount.toLocaleString('en-IN')}</strong></div>
+                    <div><span className="text-slate-600 font-bold">Sanctioned Limit:</span> <strong className="text-slate-950 font-black">₹{sanctionedAmount.toLocaleString('en-IN')}</strong></div>
                     <div>
-                      <span className="text-slate-400">Sanction Variance:</span>{' '}
-                      <strong className={isPriceWithinSanction ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                      <span className="text-slate-600 font-bold">Variance:</span>{' '}
+                      <strong className={isPriceWithinSanction ? 'text-emerald-800 font-black' : 'text-rose-800 font-black'}>
                         {isPriceWithinSanction ? `Within Budget (-₹${Math.abs(ocrPriceDelta).toLocaleString('en-IN')})` : `EXCEEDS BUDGET (+₹${ocrPriceDelta.toLocaleString('en-IN')})`}
                       </strong>
                     </div>
@@ -1296,19 +1602,19 @@ export const WorkDetailScrutiny: React.FC = () => {
                 </div>
 
                 {/* RULE 2: SLA TIMELINE DATE CHECK */}
-                <div className={`p-3 bg-slate-900 rounded-xl border ${isOcrDateWithinSla ? 'border-emerald-500/40' : 'border-rose-500/50'} space-y-2`}>
+                <div className={`p-3.5 bg-slate-50 rounded-xl border-2 ${isOcrDateWithinSla ? 'border-emerald-400' : 'border-rose-400'} space-y-2`}>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-200">2. OCR SLA Timeline Date Verification</span>
-                    <Badge variant={isOcrDateWithinSla ? 'success' : 'danger'}>
+                    <span className="font-black text-slate-950">2. OCR SLA Timeline Date Verification</span>
+                    <Badge variant={isOcrDateWithinSla ? 'success' : 'danger'} className="font-bold">
                       {isOcrDateWithinSla ? 'DATE WITHIN SLA (PASSED)' : 'SLA TIMELINE BREACH'}
                     </Badge>
                   </div>
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800 space-y-1 text-[11px]">
-                    <div><span className="text-slate-400">OCR Extracted Bill Date:</span> <strong className="text-amber-300 font-bold">{ocrBillDateStr}</strong></div>
-                    <div><span className="text-slate-400">Statutory SLA Deadline:</span> <strong className="text-slate-200 font-bold">{ocrSlaDeadlineDt.toISOString().slice(0, 10)} ({statutoryLimitDays} Days)</strong></div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-300 space-y-1 text-xs">
+                    <div><span className="text-slate-600 font-bold">Extracted Bill Date:</span> <strong className="text-amber-950 font-black">{ocrBillDateStr}</strong></div>
+                    <div><span className="text-slate-600 font-bold">SLA Deadline:</span> <strong className="text-slate-950 font-black">{ocrSlaDeadlineDt.toISOString().slice(0, 10)} ({statutoryLimitDays} Days)</strong></div>
                     <div>
-                      <span className="text-slate-400">SLA Date Verification:</span>{' '}
-                      <strong className={isOcrDateWithinSla ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                      <span className="text-slate-600 font-bold">SLA Date Status:</span>{' '}
+                      <strong className={isOcrDateWithinSla ? 'text-emerald-800 font-black' : 'text-rose-800 font-black'}>
                         {isOcrDateWithinSla ? 'Within SLA Statutory Deadline' : `EXCEEDS SLA DEADLINE (+${ocrSlaDaysOverrun} Days Overrun)`}
                       </strong>
                     </div>
@@ -1316,15 +1622,15 @@ export const WorkDetailScrutiny: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`p-3 rounded-xl text-[11px] leading-relaxed ${isOcrValid ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-300' : 'bg-rose-950/40 border border-rose-500/40 text-rose-300'}`}>
+              <div className={`p-3.5 rounded-xl text-xs leading-relaxed font-semibold border-2 ${isOcrValid ? 'bg-emerald-50 border-emerald-400 text-emerald-950' : 'bg-rose-50 border-rose-400 text-rose-950'}`}>
                 <strong>OCR Voucher Verification Finding:</strong> {isOcrValid ? `OCR PASSED COMPLIANT — Invoice claim amount (₹${ocrClaimedAmount.toLocaleString('en-IN')}) is less than/equal to sanctioned budget (₹${sanctionedAmount.toLocaleString('en-IN')}), and bill date (${ocrBillDateStr}) is safely within the statutory ${statutoryLimitDays}-day SLA window. OCR Compliance Risk Score: ${ocrComplianceRiskScore0to1} / 1.0 (PASSED).` : `OCR VERIFICATION BREACH DETECTED — ${!isPriceWithinSanction ? `Claimed invoice amount (₹${ocrClaimedAmount.toLocaleString('en-IN')}) EXCEEDS sanctioned budget limit (₹${sanctionedAmount.toLocaleString('en-IN')}) by ₹${ocrPriceDelta.toLocaleString('en-IN')}! ` : ''}${!isOcrDateWithinSla ? `Bill date (${ocrBillDateStr}) EXCEEDS statutory ${statutoryLimitDays}-day SLA deadline (${ocrSlaDeadlineDt.toISOString().slice(0, 10)}) by ${ocrSlaDaysOverrun} days!` : ''} OCR Compliance Risk Score: ${ocrComplianceRiskScore0to1} / 1.0 (CRITICAL).`}
               </div>
             </>
           ) : (
-            <div className="p-6 bg-slate-900/50 rounded-xl border border-slate-800 text-center space-y-2">
-              <UploadCloud size={28} className="mx-auto text-sky-400" />
-              <div className="font-semibold text-slate-200">Awaiting Payment Voucher Slip Upload from Implementing Agency</div>
-              <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+            <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 text-center space-y-2">
+              <UploadCloud size={30} className="mx-auto text-sky-700" />
+              <div className="font-extrabold text-slate-950 text-sm">Awaiting Payment Voucher Slip Upload from Implementing Agency</div>
+              <p className="text-xs text-slate-700 max-w-md mx-auto font-medium">
                 Upload a voucher slip / bill PDF on the IA Portal workspace. The Optical Character Recognition (OCR) Engine will extract the invoice claim amount, verify it against sanctioned budget, and check if the bill date is within the SLA window.
               </p>
             </div>
@@ -1332,83 +1638,97 @@ export const WorkDetailScrutiny: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* STEP 8: ANALYSIS (WHAT INCREASED THE RISK?) */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-slate-100 flex items-center justify-between">
+      {/* STEP 9: ANALYSIS BREAKDOWN TABLE */}
+      <Card className="border-2 border-slate-200 bg-white shadow-xs">
+        <CardHeader className="py-3 bg-slate-50 border-b border-slate-200">
+          <CardTitle className="text-sm font-extrabold text-slate-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <ShieldAlert size={16} className="text-sky-400" />
+              <ShieldAlert size={17} className="text-sky-700" />
               <span>Analysis (What Increased the Risk?)</span>
             </span>
-            <Button variant="secondary" size="sm" onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}>
+            <Button variant="secondary" size="sm" onClick={() => setShowTechnicalDetails(!showTechnicalDetails)} className="border border-slate-300 text-slate-900 bg-white hover:bg-slate-100 font-bold">
               <ChevronDown size={14} className={`mr-1 transition-transform ${showTechnicalDetails ? 'rotate-180' : ''}`} />
               {showTechnicalDetails ? 'Hide Technical Details' : 'View Technical Details (Expert View)'}
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-xs">
-          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+        <CardContent className="space-y-4 text-xs pt-4">
+          <div className="overflow-x-auto border-2 border-slate-200 rounded-xl">
             <table className="w-full text-left">
-              <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold">
+              <thead className="bg-slate-100 border-b-2 border-slate-200 text-slate-950 uppercase text-xs font-black">
                 <tr>
-                  <th className="py-2.5 px-4">Analysis Check</th>
-                  <th className="py-2.5 px-4">Risk Effect</th>
-                  <th className="py-2.5 px-4">Plain Language Finding & Explanation</th>
+                  <th className="py-3 px-4 font-black">Analysis Check</th>
+                  <th className="py-3 px-4 font-black">Risk Effect</th>
+                  <th className="py-3 px-4 font-black">Plain Language Finding & Explanation</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 bg-slate-950">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 <tr>
-                  <td className="py-2.5 px-4 font-bold text-slate-200">Payment vs physical progress</td>
-                  <td className="py-2.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isHighRisk ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                      {isHighRisk ? 'High' : 'Low'}
+                  <td className="py-3 px-4 font-black text-slate-950">Payment vs physical progress</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border ${
+                      hasProgressInputData 
+                        ? (isHighDivergence ? 'bg-rose-100 text-rose-950 border-rose-300' : 'bg-emerald-100 text-emerald-950 border-emerald-300')
+                        : 'bg-slate-100 text-slate-800 border-slate-300'
+                    }`}>
+                      {hasProgressInputData ? (isHighDivergence ? 'High' : 'Low') : 'Pending'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-300">
-                    Payment: {paymentPercentage}% | Physical: {physicalProgress}% | Delta: +{divergenceDelta}%
+                  <td className="py-3 px-4 text-slate-800 font-semibold leading-relaxed">
+                    {hasProgressInputData 
+                      ? `Payment: ${paymentPercentage}% | Physical: ${physicalProgress}% | Delta: +${divergenceDelta}% ${isHighDivergence ? '(Exceeds 20% safe divergence threshold)' : '(Within 20% safe divergence threshold)'}`
+                      : 'Awaiting physical progress & payment voucher claim submission from Implementing Agency (Physical: 0%, Payment: ₹0 / 0%).'}
                   </td>
                 </tr>
 
                 <tr>
-                  <td className="py-2.5 px-4 font-bold text-slate-200">Photo verification</td>
-                  <td className="py-2.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPhotoReused ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                  <td className="py-3 px-4 font-black text-slate-950">Photo verification</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border ${
+                      hasIaUploadedPhotos 
+                        ? (isPhotoReused ? 'bg-rose-100 text-rose-950 border-rose-300' : 'bg-emerald-100 text-emerald-950 border-emerald-300')
+                        : 'bg-slate-100 text-slate-800 border-slate-300'
+                    }`}>
                       {hasIaUploadedPhotos ? (isPhotoReused ? 'High' : 'Low') : 'Pending'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-300">
+                  <td className="py-3 px-4 text-slate-800 font-semibold leading-relaxed">
                     {hasIaUploadedPhotos 
-                      ? `2 IA Submitted Photos (${image1Name} & ${image2Name}) evaluated by pHash. Photo Reuse Risk Score: ${photoReuseRisk0to1} / 1.0 (${isPhotoReused ? 'Potential Reused Evidence' : 'Passed Integrity'})` 
+                      ? `2 IA Submitted Photos (${image1Name} & ${image2Name}) evaluated by pHash. Hamming distance: ${hammingDist} bits. Photo Reuse Risk Score: ${photoReuseRisk0to1} / 1.0 (${isPhotoReused ? 'Potential Reused Evidence' : 'Passed Photo Integrity Check'})` 
                       : 'Awaiting 2 site evidence photos from Implementing Agency.'}
                   </td>
                 </tr>
 
                 <tr>
-                  <td className="py-2.5 px-4 font-bold text-slate-200">Location verification</td>
-                  <td className="py-2.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${hasIaUploadedPhotos && isPhotoReused ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                      {hasIaUploadedPhotos && isPhotoReused ? 'High' : 'Low'}
+                  <td className="py-3 px-4 font-black text-slate-950">Location verification</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border ${
+                      hasIaUploadedPhotos 
+                        ? (isPhotoReused || gpsOffsetMeters > 500 ? 'bg-rose-100 text-rose-950 border-rose-300' : 'bg-emerald-100 text-emerald-950 border-emerald-300')
+                        : 'bg-slate-100 text-slate-800 border-slate-300'
+                    }`}>
+                      {hasIaUploadedPhotos ? (isPhotoReused || gpsOffsetMeters > 500 ? 'High' : 'Low') : 'Pending'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-300">
+                  <td className="py-3 px-4 text-slate-800 font-semibold leading-relaxed">
                     {hasIaUploadedPhotos 
-                      ? `Photo EXIF location offset ${gpsOffsetMeters} meters from registered project site` 
+                      ? `Photo EXIF location offset ${gpsOffsetMeters} meters from registered project site ${gpsOffsetMeters > 500 || isPhotoReused ? '(EXCEEDS 500m permissible site radius)' : '(Within permissible site radius)'}` 
                       : 'Awaiting site photo EXIF GPS metadata verification.'}
                   </td>
                 </tr>
 
                 <tr>
-                  <td className="py-2.5 px-4 font-bold text-slate-200">OCR Voucher & Price Sanction Check</td>
-                  <td className="py-2.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  <td className="py-3 px-4 font-black text-slate-950">OCR Voucher & Price Sanction Check</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border ${
                       hasIaSubmittedVoucher 
-                        ? (isOcrValid ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/20 text-rose-400')
-                        : 'bg-slate-800 text-slate-400'
+                        ? (isOcrValid ? 'bg-emerald-100 text-emerald-950 border-emerald-300' : 'bg-rose-100 text-rose-950 border-rose-300')
+                        : 'bg-slate-100 text-slate-800 border-slate-300'
                     }`}>
                       {hasIaSubmittedVoucher ? (isOcrValid ? 'Low' : 'High') : 'Pending'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-300">
+                  <td className="py-3 px-4 text-slate-800 font-semibold leading-relaxed">
                     {hasIaSubmittedVoucher
                       ? (isOcrValid 
                           ? `OCR PASSED: Claimed amount (₹${ocrClaimedAmount.toLocaleString('en-IN')}) <= Sanctioned (₹${sanctionedAmount.toLocaleString('en-IN')}), and Bill Date (${ocrBillDateStr}) is within SLA.` 
@@ -1418,21 +1738,21 @@ export const WorkDetailScrutiny: React.FC = () => {
                 </tr>
 
                 <tr>
-                  <td className="py-2.5 px-4 font-bold text-slate-200">Timeline & SLA</td>
-                  <td className="py-2.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      (iaPhotoEntry?.target_completion_date || iaScheduleRecord?.target_completion_date || (recommendation as any)?.target_completion_date)
-                        ? (isSlaBreached ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/10 text-emerald-400')
-                        : 'bg-slate-800 text-slate-400'
+                  <td className="py-3 px-4 font-black text-slate-950">Timeline & SLA</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border ${
+                      hasIaTargetDate
+                        ? (isSlaBreached ? 'bg-rose-100 text-rose-950 border-rose-300' : 'bg-emerald-100 text-emerald-950 border-emerald-300')
+                        : 'bg-slate-100 text-slate-800 border-slate-300'
                     }`}>
-                      {(iaPhotoEntry?.target_completion_date || iaScheduleRecord?.target_completion_date || (recommendation as any)?.target_completion_date) 
+                      {hasIaTargetDate 
                         ? (isSlaBreached ? 'High' : 'Low') 
                         : 'Pending'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-300">
-                    {(iaPhotoEntry?.target_completion_date || iaScheduleRecord?.target_completion_date || (recommendation as any)?.target_completion_date)
-                      ? (isSlaBreached ? `CRITICAL SLA BREACH: Target date (${activeCompletionDate}) from IA yields ${scheduledDurationDays} days schedule, exceeding statutory ${statutoryLimitDays}-day limit (+${Math.abs(slaMarginDays)} days overrun)` : `Target completion date (${activeCompletionDate}) from IA yields ${scheduledDurationDays} days schedule, safely within ${statutoryLimitDays}-day statutory SLA window (+${slaMarginDays} days safety buffer).`)
+                  <td className="py-3 px-4 text-slate-800 font-semibold leading-relaxed">
+                    {hasIaTargetDate
+                      ? (isSlaBreached ? `CRITICAL SLA BREACH: Target date (${activeCompletionDate}) from IA yields ${scheduledDurationDays} days schedule, exceeding statutory ${statutoryLimitDays}-day limit (+${Math.abs(slaMarginDays || iaVsDaVarianceDays)} days overrun)` : `Target completion date (${activeCompletionDate}) from IA yields ${scheduledDurationDays} days schedule, safely within ${statutoryLimitDays}-day statutory SLA window (+${slaMarginDays} days safety buffer).`)
                       : 'Awaiting Target Completion Date & Schedule input from Implementing Agency.'}
                   </td>
                 </tr>
@@ -1441,15 +1761,15 @@ export const WorkDetailScrutiny: React.FC = () => {
           </div>
 
           {showTechnicalDetails && (
-            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-3">
-              <div className="font-bold text-sky-400 uppercase text-[10px] tracking-wider">Technical Details (Expert Inspection View)</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-300">
-                <div><strong>Model Architecture:</strong> Isolation Forest Anomaly Detector v2.4</div>
-                <div><strong>pHash 2-Photo Comparator:</strong> 64-Bit DCT Perceptual Hashing</div>
-                <div><strong>Statutory SLA Engine:</strong> Statutory 75-Day Schedule Risk Model</div>
-                <div><strong>Multimodal Risk Engine:</strong> Deep ConvNet + Budget Density Ratio (0 to 1 Scale)</div>
-                <div><strong>OCR Voucher Engine:</strong> Optical Character Recognition Slip Reader & Sanction Verifier</div>
-                <div><strong>Spatial Engine:</strong> PostgreSQL PostGIS ST_Distance (SRID 4326)</div>
+            <div className="p-4 bg-slate-50 border-2 border-slate-300 rounded-xl space-y-3">
+              <div className="font-black text-sky-950 uppercase text-xs tracking-wider">Technical Details (Expert Inspection View)</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-800 font-semibold">
+                <div><strong className="text-slate-950">Model Architecture:</strong> Isolation Forest Anomaly Detector v2.4</div>
+                <div><strong className="text-slate-950">pHash 2-Photo Comparator:</strong> 64-Bit DCT Perceptual Hashing</div>
+                <div><strong className="text-slate-950">Statutory SLA Engine:</strong> Statutory 75-Day Schedule Risk Model</div>
+                <div><strong className="text-slate-950">Multimodal Risk Engine:</strong> Deep ConvNet + Budget Density Ratio (0 to 1 Scale)</div>
+                <div><strong className="text-slate-950">OCR Voucher Engine:</strong> Optical Character Recognition Slip Reader & Sanction Verifier</div>
+                <div><strong className="text-slate-950">Spatial Engine:</strong> PostgreSQL PostGIS ST_Distance (SRID 4326)</div>
               </div>
               <ShapExplainerCard explainers={[]} />
             </div>
@@ -1457,77 +1777,77 @@ export const WorkDetailScrutiny: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* STEP 9: CITIZEN OVERSIGHT & GROUND SIGNALS CARD (CITIZEN_SIGNAL) */}
-      <Card className="border-sky-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-bold text-sky-300 flex items-center justify-between">
+      {/* STEP 10: CITIZEN OVERSIGHT & GROUND SIGNALS */}
+      <Card className="border-2 border-sky-300 bg-sky-50/40 shadow-xs">
+        <CardHeader className="py-3 bg-sky-100/60 border-b border-sky-200">
+          <CardTitle className="text-sm font-extrabold text-sky-950 flex items-center justify-between">
             <span className="flex items-center space-x-2">
-              <Users size={18} className="text-sky-400" />
+              <Users size={18} className="text-sky-700" />
               <span>Citizen Oversight & Ground Signals (CITIZEN_SIGNAL)</span>
             </span>
-            <Badge variant={citizenReportsList.length > 0 ? 'warning' : 'info'}>
+            <Badge variant={citizenReportsList.length > 0 ? 'warning' : 'info'} className="font-bold">
               {citizenReportsList.length > 0 ? `${citizenReportsList.length} CITIZEN REPORTS LOGGED` : 'NO CITIZEN COMPLAINTS'}
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-xs">
-          <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl text-sky-200 leading-relaxed text-xs">
-            <strong>EVIDENCE LOOP INTEGRATION:</strong> Citizen reports contribute to the multi-source Risk Engine as supporting evidence metadata (<code className="text-amber-300">CITIZEN_SIGNAL</code>). AI never confirms fraud directly; final decisions remain strictly under human authority control.
+        <CardContent className="space-y-3 text-xs pt-4">
+          <div className="p-3 bg-white border border-sky-200 rounded-xl text-sky-950 leading-relaxed text-xs font-semibold">
+            <strong>EVIDENCE LOOP INTEGRATION:</strong> Citizen reports contribute to the multi-source Risk Engine as supporting evidence metadata (<code className="text-amber-900 font-black">CITIZEN_SIGNAL</code>). AI never confirms fraud directly; final decisions remain strictly under human authority control.
           </div>
 
           {citizenReportsList.length > 0 ? (
             <div className="space-y-2.5">
               {citizenReportsList.map((r: any) => (
-                <div key={r.id} className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+                <div key={r.id} className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-100 flex items-center space-x-2">
-                      <span className="text-sky-400 font-mono text-[11px]">{r.category}</span>
-                      <span className="text-slate-400 font-normal">by {r.reporter_name || 'Anonymous Citizen'}</span>
+                    <span className="font-bold text-slate-950 flex items-center space-x-2">
+                      <span className="text-sky-900 font-mono text-xs font-black">{r.category}</span>
+                      <span className="text-slate-600 font-medium">by {r.reporter_name || 'Anonymous Citizen'}</span>
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
+                    <span className="text-xs text-slate-600 font-mono font-bold">
                       {r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : 'Recent'}
                     </span>
                   </div>
-                  <p className="text-slate-300 italic">"{r.description}"</p>
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] text-slate-400 border-t border-slate-800/60">
-                    <span>GPS Source: <strong className="text-sky-300">{r.gps_source || 'BROWSER_GPS'}</strong></span>
-                    <span>Proximity: <strong className="text-purple-300">{r.proximity_classification || 'NEAR_WORK'}</strong></span>
-                    <span>Distance: <strong className="text-amber-300">{r.distance_from_work_meters ? `${r.distance_from_work_meters}m` : '145.2m'}</strong></span>
-                    <span>Forensics: <strong className="text-emerald-300">{r.sha256_hash ? 'SHA-256 Verified' : 'Standard'}</strong></span>
+                  <p className="text-slate-900 italic font-semibold">"{r.description}"</p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-700 border-t border-slate-100 font-bold">
+                    <span>GPS Source: <strong className="text-sky-900">{r.gps_source || 'BROWSER_GPS'}</strong></span>
+                    <span>Proximity: <strong className="text-purple-900">{r.proximity_classification || 'NEAR_WORK'}</strong></span>
+                    <span>Distance: <strong className="text-amber-900">{r.distance_from_work_meters ? `${r.distance_from_work_meters}m` : '145.2m'}</strong></span>
+                    <span>Forensics: <strong className="text-emerald-900">{r.sha256_hash ? 'SHA-256 Verified' : 'Standard'}</strong></span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 text-slate-400 text-center text-xs">
+            <div className="p-4 bg-white rounded-xl border border-slate-200 text-slate-700 text-center text-xs font-bold">
               No active citizen reports logged for this project work ID.
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* STEP 10: CASE DECISION WORKBENCH */}
-      <Card className="border-sky-500/40 bg-slate-950">
-        <CardHeader className="py-3">
-          <CardTitle className="flex items-center space-x-2 text-slate-100 text-sm font-bold">
-            <UserCheck size={18} className="text-sky-400" />
+      {/* STEP 11: CASE DECISION WORKBENCH */}
+      <Card className="border-2 border-sky-300 bg-sky-50/40 shadow-xs">
+        <CardHeader className="py-3 bg-sky-100/60 border-b border-sky-200">
+          <CardTitle className="flex items-center space-x-2 text-slate-950 text-sm font-extrabold">
+            <UserCheck size={18} className="text-sky-700" />
             <span>{isCentralRoute ? 'Central Nodal Ministry Workbench' : isStateRoute ? 'State Monitoring Authority Workbench' : 'District Case Decision Workbench'}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-xs">
+        <CardContent className="space-y-4 text-xs pt-4">
           {actionMessage && (
-            <div className="p-3.5 bg-emerald-950/90 border border-emerald-500/60 rounded-xl text-emerald-200 text-xs flex items-center space-x-2.5 shadow-lg">
-              <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-              <span className="font-bold">{actionMessage}</span>
+            <div className="p-3.5 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-emerald-950 text-xs flex items-center space-x-2.5 shadow-2xs">
+              <CheckCircle2 size={18} className="text-emerald-700 shrink-0" />
+              <span className="font-black">{actionMessage}</span>
             </div>
           )}
 
-          <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl text-sky-300 leading-relaxed flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div className="p-3.5 bg-white border border-sky-200 rounded-xl text-sky-950 leading-relaxed flex flex-col md:flex-row md:items-center justify-between gap-2 font-semibold">
             <div>
               <strong>DECISION PROTOCOL:</strong> AI and automated checks identify risk signals only. Taking case decisions requires explicit, authenticated human officer verification.
             </div>
             {recommendation?.status && (
-              <span className="px-2.5 py-1 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold font-mono shrink-0">
+              <span className="px-3 py-1 rounded-full bg-sky-100 text-sky-950 border border-sky-300 font-black font-mono shrink-0 text-xs">
                 Status: {recommendation.status}
               </span>
             )}
@@ -1541,6 +1861,7 @@ export const WorkDetailScrutiny: React.FC = () => {
               size="md" 
               disabled={actionLoading}
               onClick={() => handleCaseAction('REQUEST_EVIDENCE')}
+              className="border-2 border-slate-300 text-slate-900 bg-white hover:bg-slate-100 font-black shadow-xs"
             >
               Request More Information
             </Button>
@@ -1551,6 +1872,7 @@ export const WorkDetailScrutiny: React.FC = () => {
               size="md" 
               disabled={actionLoading}
               onClick={() => handleCaseAction('RETURN_FOR_CORRECTION')}
+              className="font-black shadow-xs"
             >
               Return for Correction
             </Button>
@@ -1561,6 +1883,7 @@ export const WorkDetailScrutiny: React.FC = () => {
               size="md" 
               disabled={actionLoading}
               onClick={() => handleCaseAction('CLEAR_CASE')}
+              className="border-2 border-emerald-400 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 font-black shadow-xs"
             >
               Mark Cleared (No Issue)
             </Button>
@@ -1571,6 +1894,7 @@ export const WorkDetailScrutiny: React.FC = () => {
               size="md" 
               disabled={actionLoading}
               onClick={() => handleCaseAction('CONFIRM_ISSUE')}
+              className="font-black shadow-xs"
             >
               Confirm Issue
             </Button>
@@ -1581,6 +1905,7 @@ export const WorkDetailScrutiny: React.FC = () => {
               size="md" 
               disabled={actionLoading}
               onClick={() => handleCaseAction(isCentralRoute ? 'FREEZE_FUNDS' : isStateRoute ? 'ESCALATE_TO_CENTRAL' : 'ESCALATE')}
+              className="font-black shadow-xs"
             >
               {isCentralRoute ? 'Freeze Installment Funds' : isStateRoute ? 'Escalate to Central Nodal Ministry' : 'Escalate to State Authority'}
             </Button>

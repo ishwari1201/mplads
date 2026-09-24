@@ -26,29 +26,29 @@ export const ShapExplainerCard: React.FC<ShapExplainerCardProps> = ({ explainers
   const displayList = explainers.length > 0 ? explainers : sampleExplainers;
 
   return (
-    <Card className="border-sky-500/30 bg-slate-950/80">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-sky-400">
-          <Sparkles size={20} />
+    <Card className="border-sky-300 bg-sky-50/40 shadow-xs">
+      <CardHeader className="border-b border-sky-100 pb-3">
+        <CardTitle className="flex items-center space-x-2 text-sky-800 font-bold">
+          <Sparkles size={20} className="text-sky-600" />
           <span>SHAP (SHapley Additive exPlanations) AI Feature Importance Card</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-xs text-slate-400">
+      <CardContent className="space-y-4 pt-4">
+        <p className="text-xs text-slate-700 font-medium">
           SHAP values explain how each individual feature nudged the Isolation Forest model output away from baseline expectation.
         </p>
 
         <div className="space-y-3">
           {displayList.map((exp, idx) => (
-            <div key={idx} className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+            <div key={idx} className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2">
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-xs text-slate-200">{exp.feature_name}</span>
-                <span className="text-xs font-extrabold text-rose-400">+{exp.shap_value} SHAP Risk Weight</span>
+                <span className="font-bold text-xs text-slate-900">{exp.feature_name}</span>
+                <span className="text-xs font-extrabold text-rose-700">+{exp.shap_value} SHAP Risk Weight</span>
               </div>
-              <p className="text-xs text-slate-400">{exp.impact_description}</p>
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+              <p className="text-xs text-slate-600 font-medium">{exp.impact_description}</p>
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
                 <div
-                  className="bg-gradient-to-r from-amber-500 to-rose-500 h-full rounded-full"
+                  className="bg-gradient-to-r from-amber-500 to-rose-600 h-full rounded-full"
                   style={{ width: `${Math.min(100, exp.shap_value * 2)}%` }}
                 />
               </div>

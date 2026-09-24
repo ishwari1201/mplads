@@ -13,14 +13,14 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseStyle = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseStyle = 'inline-flex items-center justify-center font-bold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/30 focus:ring-sky-500',
-    secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 focus:ring-slate-500',
-    danger: 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 focus:ring-rose-500',
-    outline: 'border border-sky-500/50 text-sky-400 hover:bg-sky-500/10 focus:ring-sky-500',
-    gold: 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30 focus:ring-amber-500'
+    primary: 'bg-sky-700 hover:bg-sky-800 text-white shadow-sm focus:ring-sky-500',
+    secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-2xs focus:ring-slate-400',
+    danger: 'bg-rose-700 hover:bg-rose-800 text-white shadow-sm focus:ring-rose-500',
+    outline: 'border-2 border-sky-700 text-sky-800 hover:bg-sky-50 focus:ring-sky-500',
+    gold: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm focus:ring-amber-500'
   };
 
   const sizes = {
